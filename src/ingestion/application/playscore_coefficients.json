@@ -1,0 +1,31 @@
+{
+  "version": "2.0.0",
+  "club": "default",
+  "updatedAt": "2026-07-15",
+  "notes": "v2: se activan los términos defensivos. Los pesos 'fitted' provienen de la regresión sobre informes (Ola 3); los 'prior' son juicio experto y NO están calibrados: se recalibrarán cuando la plataforma acumule eventos defensivos propios suficientes.",
+  "weights": {
+    "goal": 1.8,
+    "miss": -1.0,
+    "turnover": -0.55,
+    "save": 1.84,
+    "steal": 1.4,
+    "block": 1.0,
+    "foul": -0.1,
+    "twoMinutes": -1.2,
+    "redCard": -2.5
+  },
+  "provenance": {
+    "goal": { "origin": "fitted", "fit": "regresión sobre informes", "r2Field": 0.5, "r2Goalkeeper": 0.63 },
+    "miss": { "origin": "fitted", "fit": "regresión sobre informes" },
+    "turnover": { "origin": "fitted", "fit": "regresión sobre informes" },
+    "save": { "origin": "fitted", "fit": "regresión sobre informes", "r2Goalkeeper": 0.63 },
+    "steal": { "origin": "prior", "rationale": "Recuperación: quita la posesión y suele abrir transición. Por debajo del gol." },
+    "block": { "origin": "prior", "rationale": "Blocaje: anula el tiro pero no garantiza recuperar la posesión." },
+    "foul": { "origin": "prior", "rationale": "Falta ordinaria: táctica y muy frecuente en balonmano; penaliza poco." },
+    "twoMinutes": { "origin": "prior", "rationale": "2' de inferioridad: coste esperado cercano a un gol." },
+    "redCard": { "origin": "prior", "rationale": "Pierde al jugador el resto del partido más 2' sin sustituto." }
+  },
+  "excluded": {
+    "yellowCard": "Aviso sin coste directo en juego. Si deriva en exclusión, el coste ya lo recoge twoMinutes."
+  }
+}

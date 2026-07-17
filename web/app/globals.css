@@ -1,0 +1,42 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Identidad "sala de datos" — las variables de shadcn apuntan a la misma paleta,
+   así los primitivos (Button, Tabs, Dialog…) heredan el look sin pelearse con él. */
+:root {
+  --hb-bg: #0E1420;      --hb-panel: #151D2B;   --hb-panel-2: #1B2536;  --hb-panel-3: #212D42;
+  --hb-line: #28344A;    --hb-line-soft: #20293B;
+  --hb-text: #E8EDF4;    --hb-muted: #8B98AD;   --hb-faint: #5C6980;
+  --hb-amber: #F5B841;   --hb-home: #4EA1FF;    --hb-away: #F5A33C;
+  --hb-goal: #33C77A;    --hb-save: #4EA1FF;    --hb-neg: #F0554E;      --hb-warn: #F5B841;
+
+  /* shadcn/ui (New York), en HEX directo sobre nuestros tokens */
+  --background: var(--hb-bg);       --foreground: var(--hb-text);
+  --card: var(--hb-panel);          --card-foreground: var(--hb-text);
+  --popover: var(--hb-panel-2);     --popover-foreground: var(--hb-text);
+  --primary: var(--hb-amber);       --primary-foreground: #0E1420;
+  --secondary: var(--hb-panel-3);   --secondary-foreground: var(--hb-text);
+  --muted: var(--hb-panel-2);       --muted-foreground: var(--hb-muted);
+  --accent: var(--hb-panel-3);      --accent-foreground: var(--hb-text);
+  --destructive: var(--hb-neg);     --destructive-foreground: #E8EDF4;
+  --border: var(--hb-line);         --input: var(--hb-line);   --ring: var(--hb-amber);
+  --radius: 0.5rem;
+}
+
+* { border-color: var(--border); }
+html, body { background: var(--hb-bg); color: var(--hb-text); }
+body {
+  font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+.font-mono, .tabular { font-variant-numeric: tabular-nums; }
+
+/* Scrollbars discretos para los paneles de datos */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: var(--hb-line); border-radius: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}

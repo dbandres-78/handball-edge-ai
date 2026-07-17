@@ -1,0 +1,4 @@
+node_modules/
+.next/
+.data/          # vídeos subidos y clips renderizados (efímeros, no versionar)
+*.tsbuildinfo

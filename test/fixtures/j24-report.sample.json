@@ -1,0 +1,50 @@
+{
+  "meta": {
+    "competicion": "Liga ASOBAL",
+    "jornada": 24,
+    "fecha": "2025-03-15T18:00:00+01:00",
+    "local": "BM EJEMPLO CAJA RURAL",
+    "visitante": "Club Balonmano Muestra",
+    "informeId": "handball-ai-J24-0001"
+  },
+  "plantillas": {
+    "local": [
+      { "dorsal": 1, "nombre": "A. Portero", "puesto": "POR", "titular": true },
+      { "dorsal": 7, "nombre": "B. Lateral", "puesto": "LI", "titular": true },
+      { "dorsal": 4, "nombre": "C. Central", "puesto": "CE", "titular": true },
+      { "dorsal": 10, "nombre": "D. Extremo", "puesto": "ED", "titular": true },
+      { "dorsal": 9, "nombre": "E. Pivote", "puesto": "PIV", "titular": true },
+      { "dorsal": 3, "nombre": "F. Suplente", "puesto": "EI", "titular": false }
+    ],
+    "visitante": [
+      { "dorsal": 12, "nombre": "G. Portero", "puesto": "POR", "titular": true },
+      { "dorsal": 5, "nombre": "H. Lateral", "puesto": "LI", "titular": true },
+      { "dorsal": 8, "nombre": "I. Central", "puesto": "CE", "titular": true },
+      { "dorsal": 11, "nombre": "J. Extremo", "puesto": "ED", "titular": true },
+      { "dorsal": 6, "nombre": "K. Pivote", "puesto": "PIV", "titular": true },
+      { "dorsal": 2, "nombre": "L. Suplente", "puesto": "EI", "titular": false }
+    ]
+  },
+  "cronograma": [
+    { "min": "02:10", "parte": 1, "equipo": "local", "dorsal": 7, "accion": "Gol", "zona": 3 },
+    { "min": "03:05", "parte": 1, "equipo": "visitante", "dorsal": 11, "accion": "Tiro parado", "porteroRival": 1 },
+    { "min": "05:20", "parte": 1, "equipo": "local", "dorsal": 10, "accion": "Gol", "zona": 1 },
+    { "min": "06:00", "parte": 1, "equipo": "visitante", "dorsal": 5, "accion": "Gol", "zona": 9 },
+    { "min": "08:30", "parte": 1, "equipo": "local", "dorsal": 7, "accion": "Pérdida" },
+    { "min": "09:15", "parte": 1, "equipo": "visitante", "dorsal": 8, "accion": "Recuperación" },
+    { "min": "10:40", "parte": 1, "equipo": "local", "dorsal": 9, "accion": "Gol", "zona": 6 },
+    { "min": "12:00", "parte": 1, "equipo": "visitante", "dorsal": 11, "accion": "Gol", "zona": 2 },
+    { "min": "14:25", "parte": 1, "equipo": "local", "dorsal": 4, "accion": "Tiro fuera" },
+    { "min": "15:10", "parte": 1, "equipo": "visitante", "dorsal": 6, "accion": "Exclusión" },
+    { "min": "17:45", "parte": 1, "equipo": "local", "dorsal": 7, "accion": "Gol", "zona": 4 },
+    { "min": "20:00", "parte": 1, "equipo": "visitante", "dorsal": 5, "accion": "Tiro parado", "porteroRival": 1 },
+    { "min": "32:15", "parte": 2, "equipo": "local", "dorsal": 10, "accion": "Gol", "zona": 5 },
+    { "min": "34:00", "parte": 2, "equipo": "visitante", "dorsal": 11, "accion": "Gol", "zona": 7 },
+    { "min": "36:30", "parte": 2, "equipo": "local", "dorsal": 9, "accion": "Pérdida" },
+    { "min": "38:10", "parte": 2, "equipo": "visitante", "dorsal": 8, "accion": "Gol", "zona": 3 },
+    { "min": "41:00", "parte": 2, "equipo": "local", "dorsal": 3, "accion": "Gol", "zona": 8 },
+    { "min": "45:00", "parte": 2, "equipo": "local", "dorsal": 7, "accion": "Amarilla" },
+    { "min": "47:30", "parte": 2, "equipo": "visitante", "dorsal": 11, "accion": "Tiro parado", "porteroRival": 1 },
+    { "min": "49:00", "parte": 2, "equipo": "local", "accion": "Tiempo muerto" }
+  ]
+}
