@@ -3,6 +3,7 @@ import { Radio, Film } from 'lucide-react';
 import { PALETTE as C, MONO } from '@/lib/theme';
 import type { MatchListItem, MatchStatus } from './types';
 import { NewLiveMatch } from './NewLiveMatch';
+import { ImportReport } from './ImportReport';
 
 const STATUS: Record<MatchStatus, { label: string; color: string }> = {
   new: { label: 'Sin analizar', color: C.faint },
@@ -17,11 +18,12 @@ export function MatchLibrary({ items }: { items: MatchListItem[] }) {
         <h1 style={{ fontSize: 22, fontWeight: 700, color: C.text }}>Biblioteca de partidos</h1>
         <div className="flex items-center gap-3">
           <span style={{ fontFamily: MONO, fontSize: 12, color: C.faint }}>{items.length} partidos</span>
+          <ImportReport />
           <NewLiveMatch />
         </div>
       </div>
       <p style={{ fontSize: 13, color: C.muted, marginBottom: 20 }}>
-        Analiza vídeo y corta jugadas, o anota un partido en directo. La estadística es la misma en ambos casos.
+        Analiza vídeo y corta jugadas, anota en directo o importa un informe real. La estadística es la misma en los tres casos.
       </p>
 
       <div className="grid sm:grid-cols-2 gap-3">
