@@ -36,12 +36,17 @@ export function toListItem(m: LoadedMatch): MatchListItem {
   };
 }
 
-/** Id legible y estable: LIVE-20260715-1432 / VID-20260715-1432 */
+/**
+ * Id legible + sufijo aleatorio: VID-20260715-143205-k3f9.
+ * El sufijo evita colisiones de clave primaria cuando dos partidos se crean en el
+ * mismo segundo (detectado contra Postgres real: verify:pg + import:j24 seguidos).
+ */
 export function newMatchId(prefix = 'M'): string {
   const d = new Date();
   const p = (n: number) => String(n).padStart(2, '0');
   const stamp = `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
-  return `${prefix}-${stamp}`;
+  const rand = Math.random().toString(36).slice(2, 6);
+  return `${prefix}-${stamp}-${rand}`;
 }
 
 // --- Implementación en memoria (se reinicia con el servidor) ---
