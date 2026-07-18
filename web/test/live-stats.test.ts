@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict';
-import { EventType, ShotOutcome } from '../../src/ingestion/domain/match-event';
+import { EventType, ShotOutcome, recomputeAggregates } from '@handball/core';
 import { liveStats, toCanonicalEvents, buildRoster, UiEvent, UiTeam } from '../lib/handball/mapping';
-import { recomputeAggregates } from '../../src/ingestion/application/recompute-aggregates';
 
 const S = EventType.SHOT;
 const home: UiTeam = { name: 'BM Ejemplo', players: [

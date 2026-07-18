@@ -1,14 +1,14 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { ReportImportAdapter, RawReport } from '../src/ingestion/infrastructure/report-import.adapter';
-import { IngestMatchUseCase } from '../src/ingestion/application/ingest-match.use-case';
-import { recomputeAggregates } from '../src/ingestion/application/recompute-aggregates';
 import {
+  ReportImportAdapter, RawReport,
+  IngestMatchUseCase,
+  recomputeAggregates,
   InMemoryEntityResolver, InMemoryMatchEventRepository, InMemoryReadModelRepository,
-} from '../src/ingestion/infrastructure/in-memory-repositories';
-import { PlayerLine } from '../src/ingestion/application/read-models';
-import { computePlayScore } from '../src/ingestion/application/play-score';
-import { parseWeights } from '../src/ingestion/application/play-score-config';
+  PlayerLine,
+  computePlayScore,
+  parseWeights,
+} from '@handball/core';
 import coefficients from '../src/ingestion/application/playscore_coefficients.json';
 
 const raw = JSON.parse(

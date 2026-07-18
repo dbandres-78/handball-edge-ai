@@ -1,7 +1,5 @@
-import { EventType, ShotOrigin, ShotOutcome, MatchEvent } from '../../../src/ingestion/domain/match-event';
-import { recomputeAggregates } from '../../../src/ingestion/application/recompute-aggregates';
-import type { ResolvedRoster, ResolvedPlayer, ResolvedTeam } from '../../../src/ingestion/application/ports/repositories';
-import type { MatchSummary, PlayerLine } from '../../../src/ingestion/application/read-models';
+import { EventType, ShotOrigin, ShotOutcome, MatchEvent, recomputeAggregates } from '@handball/core';
+import type { ResolvedRoster, ResolvedPlayer, ResolvedTeam, MatchSummary, PlayerLine } from '@handball/core';
 
 export type Side = 'HOME' | 'AWAY';
 
@@ -111,8 +109,8 @@ export function liveStats(meta: MatchMeta, events: UiEvent[], home: UiTeam, away
 }
 
 // Reexportes para que la UI importe todo lo "handball" desde un único sitio.
-export { EventType, ShotOrigin, ShotOutcome } from '../../../src/ingestion/domain/match-event';
-export { PLAY_SCORE_WEIGHTS, computePlayScore } from '../../../src/ingestion/application/play-score';
-export type { MatchEvent } from '../../../src/ingestion/domain/match-event';
-export type { MatchSummary, TeamSummary, PlayerLine, PlayScore, PlayScoreTerm, OriginCount, OriginBreakdown } from '../../../src/ingestion/application/read-models';
-export type { NormalizedMatch } from '../../../src/ingestion/domain/normalized-match';
+export { EventType, ShotOrigin, ShotOutcome } from '@handball/core';
+export { PLAY_SCORE_WEIGHTS, computePlayScore } from '@handball/core';
+export type { MatchEvent } from '@handball/core';
+export type { MatchSummary, TeamSummary, PlayerLine, PlayScore, PlayScoreTerm, OriginCount, OriginBreakdown } from '@handball/core';
+export type { NormalizedMatch } from '@handball/core';

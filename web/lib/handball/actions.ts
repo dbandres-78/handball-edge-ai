@@ -1,4 +1,4 @@
-import { EventType, ShotOutcome } from '../../../src/ingestion/domain/match-event';
+import { EventType, ShotOutcome } from '@handball/core';
 
 export type Tone = 'goal' | 'save' | 'miss' | 'neg' | 'pos' | 'warn' | 'neutral';
 

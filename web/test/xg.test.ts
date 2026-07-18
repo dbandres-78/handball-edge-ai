@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict';
-import { ShotOrigin } from '../../src/ingestion/domain/match-event';
-import { computeXg, sumXg, DEFAULT_XG } from '../../src/ingestion/application/xg';
+import { ShotOrigin, computeXg, sumXg, DEFAULT_XG } from '@handball/core';
 
 /**
  * Tests del xG/xGOT de referencia (primera vuelta del club).
