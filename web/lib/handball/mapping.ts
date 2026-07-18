@@ -14,6 +14,8 @@ export interface UiEvent {
   origin?: ShotOrigin | null;
   /** Defensor rival que bloca (si outcome = BLOCKED). Sin él, el blocaje no se atribuye a nadie. */
   blockerNumber?: number | null;
+  /** Es lanzamiento de 7 metros (penalti). Sin esto, contamina el xG (un 7 m no es un tiro en juego). */
+  isPenalty?: boolean;
 }
 export interface UiClip { id: number; in: number; out: number; label: string }
 export interface MatchMeta { matchId?: string; competition?: string; matchday?: number; playedAt?: string }
@@ -43,12 +45,31 @@ export function buildRoster(home: UiTeam, away: UiTeam, matchId = 'live'): Resol
   return { matchId, teams, players };
 }
 
-/** Traduce los eventos de la UI a eventos canónicos (match_event). Misma forma que el use case. */
+/**
+ * Traduce los eventos de la UI a eventos canónicos (match_event). Misma forma que el use case.
+ *
+ * Portero en pista dinámico: se mantiene un `activeGk` por equipo que se actualiza con cada
+ * GOALKEEPER_CHANGE. Si no hay ningún cambio, el portero en pista es el primer jugador con
+ * gk: true (fallback). Para SHOT/SAVED, goalkeeperId = portero en pista del equipo RIVAL en
+ * ese instante: es el portero que está parando, no el del equipo que lanza.
+ */
 export function toCanonicalEvents(
   events: UiEvent[], home: UiTeam, away: UiTeam, playedAt: string, matchId = 'live',
 ): MatchEvent[] {
-  const gk: Record<Side, number | undefined> = { HOME: gkNumber(home), AWAY: gkNumber(away) };
-  return [...events].sort((a, b) => a.t - b.t).map((e, seq) => {
+  // Portero en pista inicial: primer jugador con gk de cada equipo.
+  const activeGk: Record<Side, number | undefined> = {
+    HOME: gkNumber(home),
+    AWAY: gkNumber(away),
+  };
+
+  const sorted = [...events].sort((a, b) => a.t - b.t);
+  return sorted.map((e, seq) => {
+    // Actualizar portero en pista ANTES de procesar el evento:
+    // un GOALKEEPER_CHANGE define quién para a partir de este momento.
+    if (e.type === EventType.GOALKEEPER_CHANGE && e.playerNumber != null) {
+      activeGk[e.side] = e.playerNumber;
+    }
+
     let payload: Record<string, unknown> = {};
     if (e.type === EventType.SHOT && e.outcome) {
       const opp: Side = e.side === 'HOME' ? 'AWAY' : 'HOME';
@@ -56,8 +77,8 @@ export function toCanonicalEvents(
         outcome: e.outcome,
         origin: e.origin ?? undefined,
         zone: e.zone ?? undefined,
-        isPenalty: false,
-        goalkeeperId: e.outcome === ShotOutcome.SAVED ? `${opp}:${gk[opp]}` : null,
+        isPenalty: e.isPenalty ?? false,
+        goalkeeperId: e.outcome === ShotOutcome.SAVED ? `${opp}:${activeGk[opp]}` : null,
         blockerId: e.outcome === ShotOutcome.BLOCKED && e.blockerNumber != null
           ? `${opp}:${e.blockerNumber}` : null,
       };

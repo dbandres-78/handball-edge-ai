@@ -39,6 +39,7 @@ export function LiveRoom({ match }: { match: LoadedMatch }) {
   const [origin, setOrigin] = useState<ShotOrigin | null>(null);
   const [blocker, setBlocker] = useState<number | null>(null);
 
+  const [activeGk, setActiveGk] = useState<Record<Side, number | null>>({ HOME: null, AWAY: null });
   const [tab, setTab] = useState<'tag' | 'stats'>('tag');
   const [editRoster, setEditRoster] = useState(false);
   const [statTeam, setStatTeam] = useState<Side>('HOME');
@@ -67,6 +68,21 @@ export function LiveRoom({ match }: { match: LoadedMatch }) {
     // El tiempo muerto para el reloj: es la razón por la que el reloj se detiene en balonmano.
     if (a.type === EventType.TIMEOUT && clock.running) clock.pause();
     doFlash(`${a.label} · ${a.teamOnly ? (side === 'HOME' ? home.name : away.name) : '#' + player} · ${fmt(t)}`);
+  };
+
+  const onGkChange = (s: Side, number: number) => {
+    if (activeGk[s] === number) return;     // ya está en pista
+    setActiveGk((prev) => ({ ...prev, [s]: number }));
+    const t = clock.now();
+    const e: UiEvent = {
+      id: idRef.current++, t, period, side: s,
+      playerNumber: number, type: EventType.GOALKEEPER_CHANGE, outcome: null, zone: null,
+    };
+    const next = [...events, e].sort((x, y) => x.t - y.t);
+    setEvents(next);
+    void persistence.record(next);
+    const teamName = s === 'HOME' ? home.name : away.name;
+    doFlash(`Portero en pista · #${number} · ${teamName} · ${fmt(t)}`);
   };
 
   /** Recupera el trabajo local de una sesión interrumpida y lo sube. */
@@ -194,7 +210,8 @@ export function LiveRoom({ match }: { match: LoadedMatch }) {
               <TagPanel side={side} setSide={setSide} player={player} setPlayer={setPlayer} period={period} setPeriod={setPeriod}
                 zone={zone} setZone={setZone} origin={origin} setOrigin={setOrigin} blocker={blocker} setBlocker={setBlocker}
                 home={home} away={away} setHome={setHome} setAway={setAway}
-                editRoster={editRoster} setEditRoster={setEditRoster} tag={tag} time={clock.seconds} />
+                editRoster={editRoster} setEditRoster={setEditRoster} tag={tag} time={clock.seconds}
+                activeGk={activeGk[side]} onGkChange={onGkChange} />
             ) : (
               <StatsPanel stats={stats} statTeam={statTeam} setStatTeam={setStatTeam} expanded={expanded} setExpanded={setExpanded} events={events} />
             )}

@@ -40,6 +40,9 @@ export function EventLog({ events, home, away, seek, delEvent }: Props) {
                 {ev.blockerNumber != null && (
                   <span style={{ fontFamily: MONO, fontSize: 11, color: C.pos }}>bloca #{ev.blockerNumber}</span>
                 )}
+                {ev.isPenalty && (
+                  <span style={{ fontFamily: MONO, fontSize: 11, color: C.warn }}>7m</span>
+                )}
                 <button onClick={() => delEvent(ev.id)} className="ml-auto w-6 h-6 rounded flex items-center justify-center flex-shrink-0" style={{ color: C.faint }}><Trash2 size={12} /></button>
               </div>
             );

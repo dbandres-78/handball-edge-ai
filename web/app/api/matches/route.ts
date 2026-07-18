@@ -18,11 +18,18 @@ interface CreateBody {
   away?: { name?: string; count?: number };
 }
 
-/** Plantilla por defecto: 1 portero + n jugadores de campo. Se edita luego en la sala. */
-const defaultRoster = (count: number) => [
-  { number: 1, name: 'Portero', gk: true },
-  ...Array.from({ length: Math.max(0, count - 1) }, (_, i) => ({ number: i + 2, name: `Jugador ${i + 2}` })),
-];
+/**
+ * Plantilla por defecto RFEBM: hasta 16 jugadores, dorsales 1–100.
+ * Convención: #1 y #12 son porteros. Se edita luego en la sala.
+ */
+const defaultRoster = (count: number) => {
+  const n = Math.min(Math.max(count, 7), 16);
+  return Array.from({ length: n }, (_, i) => {
+    const number = i + 1;
+    const isGk = number === 1 || number === 12;
+    return { number, name: isGk ? `Portero ${number}` : `Jugador ${number}`, gk: isGk };
+  });
+};
 
 export async function POST(req: Request) {
   const body = (await req.json().catch(() => null)) as CreateBody | null;
@@ -37,8 +44,8 @@ export async function POST(req: Request) {
     matchday: body?.matchday,
     mode: body?.mode === 'live' ? 'live' : 'video',
     periodMinutes: body?.periodMinutes ?? 30,
-    home: { name: homeName, players: defaultRoster(body?.home?.count ?? 12) },
-    away: { name: awayName, players: defaultRoster(body?.away?.count ?? 12) },
+    home: { name: homeName, players: defaultRoster(body?.home?.count ?? 16) },
+    away: { name: awayName, players: defaultRoster(body?.away?.count ?? 16) },
   });
 
   return NextResponse.json({ ok: true, matchId: match.matchId, mode: match.mode }, { status: 201 });

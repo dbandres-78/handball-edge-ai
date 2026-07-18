@@ -45,6 +45,7 @@ export function AnalysisRoom({ match }: { match: LoadedMatch }) {
   const [inPt, setInPt] = useState<number | null>(null);
   const [outPt, setOutPt] = useState<number | null>(null);
 
+  const [activeGk, setActiveGk] = useState<Record<Side, number | null>>({ HOME: null, AWAY: null });
   const [tab, setTab] = useState<'tag' | 'clips' | 'stats'>('tag');
   const [editRoster, setEditRoster] = useState(false);
   const [statTeam, setStatTeam] = useState<Side>('HOME');
@@ -82,6 +83,20 @@ export function AnalysisRoom({ match }: { match: LoadedMatch }) {
     const res = await uploadVideo(meta.matchId!, file);
     setServerVideo({ uploading: false, ref: res.ok ? res.videoRef ?? null : null });
     doFlash(res.ok ? 'Vídeo subido al servidor' : 'No se pudo subir el vídeo');
+  };
+
+  const onGkChange = (s: Side, number: number) => {
+    if (activeGk[s] === number) return;
+    setActiveGk((prev) => ({ ...prev, [s]: number }));
+    const e: UiEvent = {
+      id: idRef.current++, t: time, period, side: s,
+      playerNumber: number, type: EventType.GOALKEEPER_CHANGE, outcome: null, zone: null,
+    };
+    const next = [...events, e].sort((x, y) => x.t - y.t);
+    setEvents(next);
+    void persistence.record(next);
+    const teamName = s === 'HOME' ? home.name : away.name;
+    doFlash(`Portero en pista · #${number} · ${teamName} · ${fmt(time)}`);
   };
 
   const tag = (a: ActionDef) => {
@@ -211,7 +226,8 @@ export function AnalysisRoom({ match }: { match: LoadedMatch }) {
               <TagPanel side={side} setSide={setSide} player={player} setPlayer={setPlayer} period={period} setPeriod={setPeriod}
                 zone={zone} setZone={setZone} origin={origin} setOrigin={setOrigin} blocker={blocker} setBlocker={setBlocker}
                 home={home} away={away} setHome={setHome} setAway={setAway}
-                editRoster={editRoster} setEditRoster={setEditRoster} tag={tag} time={time} />
+                editRoster={editRoster} setEditRoster={setEditRoster} tag={tag} time={time}
+                activeGk={activeGk[side]} onGkChange={onGkChange} />
             )}
             {tab === 'clips' && (
               <ClipsPanel clips={clips} inPt={inPt} outPt={outPt} time={time} markIn={markIn} markOut={markOut}

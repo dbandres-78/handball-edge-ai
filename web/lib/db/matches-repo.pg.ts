@@ -10,7 +10,10 @@ import { getPool, asJson, type Queryable } from './pg';
 const SIDES: Side[] = ['HOME', 'AWAY'];
 
 function rowToUiEvent(r: any): UiEvent {
-  const payload = asJson<{ outcome?: string | null; origin?: string | null; zone?: number | null; blockerNumber?: number | null }>(r.payload ?? {});
+  const payload = asJson<{
+    outcome?: string | null; origin?: string | null; zone?: number | null;
+    blockerNumber?: number | null; isPenalty?: boolean;
+  }>(r.payload ?? {});
   return {
     id: r.seq,
     t: r.game_clock_ms / 1000,
@@ -22,6 +25,7 @@ function rowToUiEvent(r: any): UiEvent {
     zone: payload.zone ?? null,
     origin: (payload.origin ?? null) as ShotOrigin | null,
     blockerNumber: payload.blockerNumber ?? null,
+    isPenalty: payload.isPenalty ?? undefined,
   };
 }
 
@@ -41,7 +45,10 @@ export function makePgMatchesRepository(db: Queryable): PgMatchesRepository {
         `INSERT INTO match_event(match_id, seq, game_clock_ms, period, side, player_number, type, payload)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb)`,
         [matchId, seq++, Math.round(e.t * 1000), e.period, e.side, e.playerNumber ?? null, e.type,
-         JSON.stringify({ outcome: e.outcome ?? null, origin: e.origin ?? null, zone: e.zone ?? null, blockerNumber: e.blockerNumber ?? null })],
+         JSON.stringify({
+           outcome: e.outcome ?? null, origin: e.origin ?? null, zone: e.zone ?? null,
+           blockerNumber: e.blockerNumber ?? null, isPenalty: e.isPenalty ?? null,
+         })],
       );
     }
   }

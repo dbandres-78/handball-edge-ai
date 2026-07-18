@@ -25,6 +25,7 @@ export const ACTIONS: ActionDef[] = [
   { key: 'AMAR',   label: 'Amarilla',      type: EventType.YELLOW_CARD,  tone: 'warn' },
   { key: 'ROJA',   label: 'Roja',          type: EventType.RED_CARD,     tone: 'neg' },
   { key: 'TIME',   label: 'Tiempo muerto', type: EventType.TIMEOUT, teamOnly: true, tone: 'neutral' },
+  { key: 'GK',     label: 'Cambio portero', type: EventType.GOALKEEPER_CHANGE, tone: 'neutral' },
 ];
 
 export const actionByType = (type: EventType, outcome: ShotOutcome | null): ActionDef | undefined => {
