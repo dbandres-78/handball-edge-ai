@@ -17,7 +17,8 @@
     "test:xg": "tsx test/xg.test.ts",
     "test:video": "tsx test/video-upload.test.ts",
     "test:core": "tsx test/core-barrel.test.ts",
-    "test": "npm run test:lib && npm run test:db && npm run test:live && npm run test:zones && npm run test:backup && npm run test:render && npm run test:gk && npm run test:pg-persist && npm run test:xg && npm run test:video && npm run test:core",
+    "test:ingest": "tsx test/ingest-bridge.test.ts",
+    "test": "npm run test:lib && npm run test:db && npm run test:live && npm run test:zones && npm run test:backup && npm run test:render && npm run test:gk && npm run test:pg-persist && npm run test:xg && npm run test:video && npm run test:core && npm run test:ingest",
     "typecheck:lib": "tsc -p tsconfig.lib.json --noEmit"
   },
   "dependencies": {
