@@ -43,11 +43,19 @@ export async function extractStats(matchId: string): Promise<ExtractResult> {
   return r.json();
 }
 
-export interface UploadResult { ok: boolean; videoRef?: string; durationSec?: number; error?: string }
+export interface UploadResult { ok: boolean; videoRef?: string; durationSec?: number; sizeBytes?: number; error?: string }
 export async function uploadVideo(matchId: string, file: File): Promise<UploadResult> {
-  const form = new FormData();
-  form.append('file', file);
-  const r = await fetch(`/api/matches/${matchId}/video`, { method: 'POST', body: form });
+  // Enviamos el binario crudo por streaming (el body es el propio File, no FormData).
+  // El servidor lo vuelca a disco chunk a chunk sin cargarlo entero en RAM.
+  // La extensión viaja por query porque el body ya no lleva el nombre del archivo.
+  const ext = (file.name.match(/\.[a-z0-9]+$/i)?.[0] ?? '.mp4').toLowerCase();
+  const r = await fetch(`/api/matches/${matchId}/video?ext=${encodeURIComponent(ext)}`, {
+    method: 'POST',
+    body: file,
+    headers: { 'content-type': file.type || 'application/octet-stream' },
+    // @ts-expect-error — duplex es necesario para enviar un stream como body (Node/fetch).
+    duplex: 'half',
+  });
   const data = await r.json().catch(() => ({}));
   return { ok: r.ok, ...data };
 }

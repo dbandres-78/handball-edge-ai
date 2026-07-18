@@ -50,6 +50,8 @@ export interface PlayerLine {
   shots: number;
   misses: number;
   saves: number;                // portero
+  xg: number;                   // expected goals: suma por zona de lanzamiento
+  xgot: number;                 // expected goals on target: xG ajustado por colocación
   byOrigin: OriginBreakdown;    // tiros/goles por zona de lanzamiento (base del xG)
   turnovers: number;
   steals: number;
@@ -69,6 +71,8 @@ export interface TeamSummary {
   shots: number;
   saves: number;
   savePct: number | null;       // saves / (saves + goles encajados)
+  xg: number;                   // expected goals del equipo (suma por zona de lanzamiento)
+  xgot: number;                 // expected goals on target del equipo
   byOrigin: OriginBreakdown;    // tiros/goles por zona de lanzamiento (base del xG)
   goalZones: Partial<Record<number, number>>;   // goles por zona de portería 1..9 (base del xGOT)
   turnovers: number;

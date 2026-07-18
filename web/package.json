@@ -14,7 +14,9 @@
     "test:backup": "tsx test/backup.test.ts",
     "test:gk": "tsx test/goalkeeper-change.test.ts",
     "test:pg-persist": "tsx test/pg-persistence.test.ts",
-    "test": "npm run test:lib && npm run test:db && npm run test:live && npm run test:zones && npm run test:backup && npm run test:render && npm run test:gk && npm run test:pg-persist",
+    "test:xg": "tsx test/xg.test.ts",
+    "test:video": "tsx test/video-upload.test.ts",
+    "test": "npm run test:lib && npm run test:db && npm run test:live && npm run test:zones && npm run test:backup && npm run test:render && npm run test:gk && npm run test:pg-persist && npm run test:xg && npm run test:video",
     "typecheck:lib": "tsc -p tsconfig.lib.json --noEmit"
   },
   "dependencies": {

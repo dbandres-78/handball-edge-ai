@@ -16,6 +16,7 @@ interface Props {
   zone: number | null; setZone: (z: number | null) => void;
   origin: ShotOrigin | null; setOrigin: (o: ShotOrigin | null) => void;
   blocker: number | null; setBlocker: (n: number | null) => void;
+  isPenalty: boolean; setIsPenalty: (v: boolean) => void;
   home: UiTeam; away: UiTeam;
   setHome: (t: UiTeam) => void; setAway: (t: UiTeam) => void;
   editRoster: boolean; setEditRoster: (v: boolean) => void;
@@ -159,6 +160,25 @@ export function TagPanel(p: Props) {
             : 'Colocación del tiro en la portería'}
         </div>
       </div>
+
+      {/* Penalti (7m): xG fijo, fuera del juego abierto. No usa zona de pista. */}
+      <button onClick={() => p.setIsPenalty(!p.isPenalty)}
+        className="flex items-center justify-between p-2.5 rounded-md w-full"
+        style={{
+          background: p.isPenalty ? accent : C.panel2,
+          border: `1px solid ${p.isPenalty ? accent : C.line}`,
+        }}>
+        <span style={{ fontSize: 11, fontWeight: 600, color: p.isPenalty ? '#0E1420' : C.text }}>
+          Lanzamiento de 7 metros
+        </span>
+        <span className="px-2 py-0.5 rounded" style={{
+          fontFamily: MONO, fontSize: 10, fontWeight: 700,
+          background: p.isPenalty ? '#0E1420' : C.panel,
+          color: p.isPenalty ? accent : C.faint,
+        }}>
+          {p.isPenalty ? '7M ✓' : '7M'}
+        </span>
+      </button>
 
       {/* Autor del blocaje: sin él, «Blocado» no puntúa a ningún defensor. */}
       <div className="p-2.5 rounded-md" style={{ background: C.panel2, border: `1px solid ${C.line}` }}>

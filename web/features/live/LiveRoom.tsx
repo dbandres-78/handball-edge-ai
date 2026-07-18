@@ -38,6 +38,7 @@ export function LiveRoom({ match }: { match: LoadedMatch }) {
   const [zone, setZone] = useState<number | null>(null);
   const [origin, setOrigin] = useState<ShotOrigin | null>(null);
   const [blocker, setBlocker] = useState<number | null>(null);
+  const [isPenalty, setIsPenalty] = useState(false);
 
   const [activeGk, setActiveGk] = useState<Record<Side, number | null>>({ HOME: null, AWAY: null });
   const [tab, setTab] = useState<'tag' | 'stats'>('tag');
@@ -60,11 +61,12 @@ export function LiveRoom({ match }: { match: LoadedMatch }) {
       type: a.type, outcome: a.outcome ?? null, zone: a.shot ? zone : null,
       origin: a.shot ? origin : null,
       blockerNumber: a.outcome === ShotOutcome.BLOCKED ? blocker : null,
+      isPenalty: a.shot && isPenalty ? true : undefined,
     };
     const next = [...events, e].sort((x, y) => x.t - y.t);
     setEvents(next);
     void persistence.record(next);          // 1) dispositivo ya; 2) servidor por detrás
-    if (a.shot) { setZone(null); setOrigin(null); setBlocker(null); }
+    if (a.shot) { setZone(null); setOrigin(null); setBlocker(null); setIsPenalty(false); }
     // El tiempo muerto para el reloj: es la razón por la que el reloj se detiene en balonmano.
     if (a.type === EventType.TIMEOUT && clock.running) clock.pause();
     doFlash(`${a.label} · ${a.teamOnly ? (side === 'HOME' ? home.name : away.name) : '#' + player} · ${fmt(t)}`);
@@ -208,7 +210,7 @@ export function LiveRoom({ match }: { match: LoadedMatch }) {
           <div className="flex-1 min-h-0 overflow-y-auto">
             {tab === 'tag' ? (
               <TagPanel side={side} setSide={setSide} player={player} setPlayer={setPlayer} period={period} setPeriod={setPeriod}
-                zone={zone} setZone={setZone} origin={origin} setOrigin={setOrigin} blocker={blocker} setBlocker={setBlocker}
+                zone={zone} setZone={setZone} origin={origin} setOrigin={setOrigin} blocker={blocker} setBlocker={setBlocker} isPenalty={isPenalty} setIsPenalty={setIsPenalty}
                 home={home} away={away} setHome={setHome} setAway={setAway}
                 editRoster={editRoster} setEditRoster={setEditRoster} tag={tag} time={clock.seconds}
                 activeGk={activeGk[side]} onGkChange={onGkChange} />

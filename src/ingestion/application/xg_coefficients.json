@@ -1,0 +1,64 @@
+{
+  "version": "1.0.0",
+  "club": "default",
+  "source": "primera-vuelta",
+  "updatedAt": "2026-07-18",
+  "notes": "Coeficientes fijos de referencia derivados de los porcentajes reales de la primera vuelta. xgByOrigin = probabilidad base de gol según la zona de LANZAMIENTO (input de xG). placementByZone = probabilidad de gol según la zona de PORTERÍA a la que va el tiro (input de xGOT, condicionado a tiro a puerta). El xGOT de una acción = xg(origin) escalado por el factor de colocación relativo. El 7M es zona propia con xG fijo, fuera del juego abierto. Estos valores son priors de referencia sobre los que el modelo del club trabajará; se recalibran cuando la plataforma acumule tiros propios suficientes.",
+
+  "xgByOrigin": {
+    "WING_LEFT":   0.61,
+    "WING_RIGHT":  0.63,
+    "SIX_LEFT":    0.66,
+    "SIX_CENTER":  0.70,
+    "SIX_RIGHT":   0.62,
+    "NINE_LEFT":   0.45,
+    "NINE_CENTER": 0.45,
+    "NINE_RIGHT":  0.45
+  },
+
+  "penaltyXg": 0.75,
+
+  "placementByZone": {
+    "1": 0.808,
+    "2": 0.717,
+    "3": 0.641,
+    "4": 0.662,
+    "5": 0.125,
+    "6": 0.722,
+    "7": 0.835,
+    "8": 0.844,
+    "9": 0.710
+  },
+
+  "placementBaseline": 0.728,
+
+  "provenance": {
+    "xgByOrigin": {
+      "origin": "reference",
+      "rationale": "Valores (XG %) de la imagen de zonas de lanzamiento de la primera vuelta. Los 9m comparten 0.45 porque la referencia no distingue lado en tiro exterior.",
+      "sample": {
+        "WING_LEFT": "29/54", "WING_RIGHT": "30/63",
+        "SIX_LEFT": "35/48", "SIX_CENTER": "80/104", "SIX_RIGHT": "40/54",
+        "NINE_LEFT": "12/27", "NINE_CENTER": "71/130", "NINE_RIGHT": "18/35"
+      }
+    },
+    "penaltyXg": {
+      "origin": "reference",
+      "rationale": "7M global de la primera vuelta: 56/75 = 0.747, redondeado al (XG %) de referencia 0.75.",
+      "sample": "56/75"
+    },
+    "placementByZone": {
+      "origin": "reference",
+      "rationale": "goles/tiros por zona de portería (vista del portero) de la primera vuelta. Zona 5 (centro-centro) es la de mayor parada. Zonas 7-8 (esquinas bajas) las más convertidas.",
+      "sample": {
+        "1": "42/52", "2": "33/46", "3": "25/39",
+        "4": "51/77", "5": "2/16", "6": "52/72",
+        "7": "66/79", "8": "54/64", "9": "49/69"
+      }
+    },
+    "placementBaseline": {
+      "origin": "derived",
+      "rationale": "Media ponderada de conversión sobre todas las zonas de portería (374/514 = 0.728). Se usa para normalizar el factor de colocación: xGOT = xG * (placement / baseline)."
+    }
+  }
+}

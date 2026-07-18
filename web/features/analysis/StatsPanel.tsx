@@ -41,10 +41,10 @@ export function StatsPanel(p: Props) {
     return z;
   }, [p.events, p.statTeam]);
 
-  const Metric = ({ label, value, sub }: { label: string; value: React.ReactNode; sub?: string }) => (
+  const Metric = ({ label, value, sub, tone }: { label: string; value: React.ReactNode; sub?: string; tone?: 'pos' | 'neg' }) => (
     <div className="p-2 rounded-md" style={{ background: C.panel2, border: `1px solid ${C.line}` }}>
       <div style={{ fontSize: 10, letterSpacing: 0.5, color: C.faint }}>{label}</div>
-      <div style={{ fontFamily: MONO, fontSize: 20, fontWeight: 700, color: C.text }}>{value}<span style={{ fontSize: 11, color: C.muted, fontWeight: 400 }}>{sub}</span></div>
+      <div style={{ fontFamily: MONO, fontSize: 20, fontWeight: 700, color: tone === 'pos' ? C.pos : tone === 'neg' ? C.warn : C.text }}>{value}<span style={{ fontSize: 11, color: C.muted, fontWeight: 400 }}>{sub}</span></div>
     </div>
   );
 
@@ -63,6 +63,10 @@ export function StatsPanel(p: Props) {
         <Metric label="GOLES" value={s.goals} />
         <Metric label="TIROS" value={s.shots} />
         <Metric label="EFIC." value={eff} sub="%" />
+        <Metric label="xG" value={s.xg} />
+        <Metric label="xGOT" value={s.xgot} />
+        <Metric label="G–xG" value={`${s.goals - s.xg > 0 ? '+' : ''}${Math.round((s.goals - s.xg) * 10) / 10}`}
+          tone={s.goals - s.xg >= 0 ? 'pos' : 'neg'} />
         <Metric label="PARADAS" value={s.saves} />
         <Metric label="SAVE %" value={s.savePct != null ? Math.round(s.savePct * 1000) / 10 : '—'} sub={s.savePct != null ? '%' : ''} />
         <Metric label="PÉRD." value={s.turnovers} />
