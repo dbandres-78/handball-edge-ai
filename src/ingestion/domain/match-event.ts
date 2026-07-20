@@ -12,7 +12,8 @@ export enum EventType {
   YELLOW_CARD = 'YELLOW_CARD',   // amonestación
   RED_CARD = 'RED_CARD',         // descalificación
   TIMEOUT = 'TIMEOUT',
-  GOALKEEPER_CHANGE = 'GOALKEEPER_CHANGE',   // entra un portero; define quién para a partir de aquí           // tiempo muerto (nivel equipo)
+  GOALKEEPER_CHANGE = 'GOALKEEPER_CHANGE',   // entra un portero; define quién para a partir de aquí
+  SUBSTITUTION = 'SUBSTITUTION',   // cambio de jugador de campo: define quién está en pista (base del ±)
 }
 
 /**
@@ -45,6 +46,17 @@ export interface ShotPayload {
   isPenalty?: boolean;
   goalkeeperId?: string | null;  // portero rival implicado (si SAVED)
   blockerId?: string | null;     // defensor que bloca (si BLOCKED); sin él, el blocaje no se atribuye
+}
+
+/**
+ * Cambio de jugador de campo. Es lo que permite reconstruir quién está en pista en cada
+ * instante y, por tanto, calcular el ± (plus-minus) individual. Sin estos eventos, la
+ * reconstrucción asume que los titulares están en pista todo el partido (degradación honesta:
+ * el ± de los titulares es correcto y el del banquillo queda a 0 hasta que se registren cambios).
+ */
+export interface SubstitutionPayload {
+  playerOutId: string | null;    // jugador que sale de la pista
+  playerInId: string | null;     // jugador que entra a la pista
 }
 
 export interface MatchEvent {

@@ -1,4 +1,4 @@
-import { EventType, MatchEvent, ShotOrigin, ShotOutcome, ShotPayload } from '../domain/match-event';
+import { EventType, MatchEvent, ShotOrigin, ShotOutcome, ShotPayload, SubstitutionPayload } from '../domain/match-event';
 import { computePlayScore } from './play-score';
 import { computeXg } from './xg';
 import { MatchSummary, OriginBreakdown, PlayerLine, TeamSummary } from './read-models';
@@ -8,6 +8,7 @@ interface PlayerAcc {
   goals: number; shots: number; misses: number; saves: number;
   turnovers: number; steals: number; blocks: number; fouls: number;
   twoMinutes: number; yellowCards: number; redCards: number;
+  plusMinus: number;
   xg: number; xgot: number;
   byOrigin: OriginBreakdown;
 }
@@ -30,6 +31,7 @@ const emptyPlayerAcc = (): PlayerAcc => ({
   goals: 0, shots: 0, misses: 0, saves: 0,
   turnovers: 0, steals: 0, blocks: 0, fouls: 0,
   twoMinutes: 0, yellowCards: 0, redCards: 0,
+  plusMinus: 0,
   xg: 0, xgot: 0,
   byOrigin: {},
 });
@@ -70,9 +72,50 @@ export function recomputeAggregates(
   }
   const inc = (m: Map<string, number>, k: string, by = 1) => m.set(k, (m.get(k) ?? 0) + by);
 
+  // ── Reconstrucción de "quién está en pista" para el ± (plus-minus) ───────────────
+  // Se parte de los titulares y se va mutando con cada SUBSTITUTION y GOALKEEPER_CHANGE.
+  // Si no hay cambios registrados, los titulares se consideran en pista todo el partido
+  // (degradación honesta; el ± del banquillo queda a 0 hasta que se etiqueten cambios).
+  const onCourt = new Map<string, Set<string>>();       // teamId -> jugadores en pista
+  const currentGk = new Map<string, string | undefined>();
+  const opponentTeamId = new Map<string, string>();
+  for (const t of roster.teams) {
+    onCourt.set(t.teamId, new Set());
+    currentGk.set(t.teamId, undefined);
+    const opp = roster.teams.find(x => x.teamId !== t.teamId);
+    if (opp) opponentTeamId.set(t.teamId, opp.teamId);
+  }
+  for (const p of roster.players) {
+    if (!p.starter) continue;
+    onCourt.get(p.teamId)?.add(p.playerId);
+    if (p.position === 'GK' && !currentGk.get(p.teamId)) currentGk.set(p.teamId, p.playerId);
+  }
+
   for (const ev of events) {
     const acc = ev.playerId ? playerAcc.get(ev.playerId) : undefined;
     switch (ev.type) {
+      case EventType.SUBSTITUTION: {
+        const sub = ev.payload as unknown as SubstitutionPayload;
+        const set = onCourt.get(ev.teamId);
+        if (set) {
+          if (sub.playerOutId) set.delete(sub.playerOutId);
+          if (sub.playerInId) set.add(sub.playerInId);
+        }
+        break;
+      }
+      case EventType.GOALKEEPER_CHANGE: {
+        // El portero entrante sustituye al que estaba en pista (cambio portero-por-portero).
+        if (ev.playerId) {
+          const set = onCourt.get(ev.teamId);
+          const prev = currentGk.get(ev.teamId);
+          if (set) {
+            if (prev && prev !== ev.playerId) set.delete(prev);
+            set.add(ev.playerId);
+          }
+          currentGk.set(ev.teamId, ev.playerId);
+        }
+        break;
+      }
       case EventType.SHOT: {
         const shot = ev.payload as unknown as ShotPayload;
         inc(teamShots, ev.teamId);
@@ -97,6 +140,14 @@ export function recomputeAggregates(
           if (shot.zone) {
             const gz = teamGoalZones.get(ev.teamId)!;
             gz[shot.zone] = (gz[shot.zone] ?? 0) + 1;
+          }
+          // ±: +1 a los en pista del equipo que marca, −1 a los del rival.
+          for (const pid of onCourt.get(ev.teamId) ?? []) {
+            const a = playerAcc.get(pid); if (a) a.plusMinus += 1;
+          }
+          const oppId = opponentTeamId.get(ev.teamId);
+          if (oppId) for (const pid of onCourt.get(oppId) ?? []) {
+            const a = playerAcc.get(pid); if (a) a.plusMinus -= 1;
           }
         } else if (acc) {
           acc.misses++;
@@ -179,10 +230,11 @@ export function recomputeAggregates(
       xg: round2(a.xg), xgot: round2(a.xgot), byOrigin: a.byOrigin,
       turnovers: a.turnovers, steals: a.steals, blocks: a.blocks, fouls: a.fouls,
       twoMinutes: a.twoMinutes, yellowCards: a.yellowCards, redCards: a.redCards,
+      plusMinus: a.plusMinus,
       playScore: computePlayScore({
         goals: a.goals, misses: a.misses, turnovers: a.turnovers, saves: a.saves,
         steals: a.steals, blocks: a.blocks, fouls: a.fouls,
-        twoMinutes: a.twoMinutes, redCards: a.redCards,
+        twoMinutes: a.twoMinutes, redCards: a.redCards, plusMinus: a.plusMinus,
       }),
     };
   });

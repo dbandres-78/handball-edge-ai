@@ -110,11 +110,12 @@ export function StatsPanel(p: Props) {
       </div>
 
       <div className="rounded-md overflow-hidden" style={{ border: `1px solid ${C.line}` }}>
-        <div className="grid items-center px-2 py-1.5" style={{ gridTemplateColumns: '28px 1fr 26px 26px 26px 26px 52px', background: C.panel2, fontSize: 10, letterSpacing: 0.5, color: C.faint }}>
+        <div className="grid items-center px-2 py-1.5" style={{ gridTemplateColumns: '28px 1fr 26px 26px 26px 32px 26px 52px', background: C.panel2, fontSize: 10, letterSpacing: 0.5, color: C.faint }}>
           <span>#</span><span>JUGADOR</span>
           <span className="text-center" title="Goles">G</span>
           <span className="text-center" title="Pérdidas">P</span>
           <span className="text-center" title="Defensa: recuperaciones + blocajes">D</span>
+          <span className="text-center" title="Diferencial de goles del equipo con el jugador en pista">±</span>
           <span className="text-center" title="Paradas">★</span>
           <span className="text-right">PS</span>
         </div>
@@ -125,12 +126,13 @@ export function StatsPanel(p: Props) {
           return (
             <div key={pl.number}>
               <button onClick={() => p.setExpanded(open ? null : key)} className="grid items-center px-2 py-1.5 w-full text-left"
-                style={{ gridTemplateColumns: '28px 1fr 26px 26px 26px 26px 52px', borderTop: `1px solid ${C.lineSoft}`, background: open ? C.panel2 : 'transparent' }}>
+                style={{ gridTemplateColumns: '28px 1fr 26px 26px 26px 32px 26px 52px', borderTop: `1px solid ${C.lineSoft}`, background: open ? C.panel2 : 'transparent' }}>
                 <span style={{ fontFamily: MONO, color: accent, fontWeight: 700 }}>{pl.number}</span>
                 <span className="truncate flex items-center gap-1" style={{ fontSize: 13 }}>{pl.position === 'GK' && <Shield size={11} color={C.amber} />}{pl.name}</span>
                 <span className="text-center" style={{ fontFamily: MONO, fontSize: 13 }}>{pl.goals}</span>
                 <span className="text-center" style={{ fontFamily: MONO, fontSize: 13, color: C.muted }}>{pl.turnovers}</span>
                 <span className="text-center" style={{ fontFamily: MONO, fontSize: 13, color: C.pos }}>{pl.steals + pl.blocks || ''}</span>
+                <span className="text-center" style={{ fontFamily: MONO, fontSize: 13, color: pl.plusMinus > 0 ? C.goal : pl.plusMinus < 0 ? C.neg : C.muted }}>{pl.plusMinus > 0 ? '+' : ''}{pl.plusMinus || '0'}</span>
                 <span className="text-center" style={{ fontFamily: MONO, fontSize: 13, color: C.save }}>{pl.saves || ''}</span>
                 <span className="text-right flex items-center justify-end gap-1" style={{ fontFamily: MONO, fontSize: 14, fontWeight: 700, color: ps > 0 ? C.goal : ps < 0 ? C.neg : C.muted }}>
                   {ps > 0 ? '+' : ''}{ps}<ChevronRight size={12} color={C.faint} style={{ transform: open ? 'rotate(90deg)' : 'none', transition: 'transform .15s' }} />
@@ -166,6 +168,13 @@ export function StatsPanel(p: Props) {
                       </div>
                     </div>
                   )}
+                  <div className="flex items-center justify-between mt-2 pt-2" style={{ fontFamily: MONO, fontSize: 11, borderTop: `1px solid ${C.lineSoft}`, color: C.faint }}>
+                    <span className="flex items-center gap-1">
+                      Diferencial en pista (±)
+                      <span title="Peso 0 por defecto: no suma al Play Score hasta calibrarlo" style={{ fontSize: 9, color: C.amber, border: `1px solid ${C.line}`, borderRadius: 3, padding: '0 3px' }}>prior</span>
+                    </span>
+                    <span style={{ color: pl.plusMinus > 0 ? C.goal : pl.plusMinus < 0 ? C.neg : C.muted, fontWeight: 700 }}>{pl.plusMinus > 0 ? '+' : ''}{pl.plusMinus}</span>
+                  </div>
                 </div>
               )}
             </div>
@@ -176,6 +185,11 @@ export function StatsPanel(p: Props) {
         Play Score: núcleo ajustado por regresión (gol +1.8, fallo −1.0, pérdida −0.55, parada +1.84) más
         términos defensivos marcados <span style={{ color: C.amber }}>prior</span> (recuperación, blocaje,
         exclusión…), que son pesos expertos pendientes de calibrar con datos propios.
+      </div>
+      <div className="text-xs px-1" style={{ color: C.faint }}>
+        Diferencial ± = goles del equipo con el jugador en pista. Se muestra siempre; por defecto no suma al
+        Play Score (solapa con los goles ya puntuados y su precisión depende de registrar los cambios en
+        pista). Sin cambios etiquetados, refleja el diferencial del equipo para los titulares.
       </div>
     </div>
   );

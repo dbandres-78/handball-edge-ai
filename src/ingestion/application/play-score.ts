@@ -25,6 +25,7 @@ export interface PlayScoreWeights {
   foul: number;
   twoMinutes: number;
   redCard: number;
+  plusMinus: number;
 }
 
 export const PLAY_SCORE_WEIGHTS: PlayScoreWeights = {
@@ -39,12 +40,19 @@ export const PLAY_SCORE_WEIGHTS: PlayScoreWeights = {
   foul: -0.1,        // falta ordinaria: táctica y muy frecuente en balonmano; apenas penaliza
   twoMinutes: -1.2,  // 2' de inferioridad ≈ coste esperado cercano a un gol
   redCard: -2.5,     // pierde al jugador el resto del partido + 2' sin sustituto
+  // --- plus-minus (±): prior de solo-visualización por defecto ---
+  // Peso 0 a propósito: (1) el ± SOLAPA con el núcleo ajustado (tus goles ya puntúan en 'goal'),
+  // así que sumarlo crudo sería doble conteo; (2) su precisión depende de registrar los cambios
+  // en pista, aún no capturados. Se muestra siempre como estadística; para pesarlo en el score,
+  // asigna un valor en playscore_coefficients.json una vez calibrado.
+  plusMinus: 0,
 };
 
 /** Qué peso es ajustado y cuál es prior. La UI y el desglose lo exponen. */
 export const TERM_ORIGIN: Record<keyof PlayScoreWeights, TermOrigin> = {
   goal: 'fitted', miss: 'fitted', turnover: 'fitted', save: 'fitted',
   steal: 'prior', block: 'prior', foul: 'prior', twoMinutes: 'prior', redCard: 'prior',
+  plusMinus: 'prior',
 };
 
 export interface PlayScoreInput {
@@ -57,6 +65,7 @@ export interface PlayScoreInput {
   fouls?: number;
   twoMinutes?: number;
   redCards?: number;
+  plusMinus?: number;
 }
 
 const round2 = (n: number): number => Math.round(n * 100) / 100;
@@ -79,17 +88,21 @@ export function computePlayScore(
     ['foul', input.fouls ?? 0],
     ['twoMinutes', input.twoMinutes ?? 0],
     ['redCard', input.redCards ?? 0],
+    ['plusMinus', input.plusMinus ?? 0],
   ];
 
+  // Filtramos por CONTRIBUCIÓN (count × weight), no por count: así un término con peso 0
+  // (p. ej. plusMinus por defecto) no aparece en el desglose ni altera los totales, mientras
+  // que en cuanto se le asigna un peso, entra como cualquier otro término prior.
   const breakdown: PlayScoreTerm[] = rows
-    .filter(([, count]) => count !== 0)
     .map(([term, count]) => ({
       term,
       count,
       weight: weights[term],
       contribution: round2(count * weights[term]),
       origin: TERM_ORIGIN[term],
-    }));
+    }))
+    .filter((t) => t.contribution !== 0);
 
   const sum = (origin: TermOrigin) =>
     round2(breakdown.filter(t => t.origin === origin).reduce((s, t) => s + t.contribution, 0));

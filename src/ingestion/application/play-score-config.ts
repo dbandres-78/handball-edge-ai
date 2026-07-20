@@ -1,7 +1,7 @@
 import { PlayScoreWeights, PLAY_SCORE_WEIGHTS } from './play-score';
 
 const TERMS: Array<keyof PlayScoreWeights> = [
-  'goal', 'miss', 'turnover', 'save', 'steal', 'block', 'foul', 'twoMinutes', 'redCard',
+  'goal', 'miss', 'turnover', 'save', 'steal', 'block', 'foul', 'twoMinutes', 'redCard', 'plusMinus',
 ];
 
 export interface CoefficientsFile {

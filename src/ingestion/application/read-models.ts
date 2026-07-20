@@ -60,6 +60,7 @@ export interface PlayerLine {
   twoMinutes: number;
   yellowCards: number;
   redCards: number;
+  plusMinus: number;            // diferencial de goles del equipo mientras el jugador está en pista (±)
   playScore: PlayScore;
 }
 

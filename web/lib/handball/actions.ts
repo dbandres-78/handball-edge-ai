@@ -36,5 +36,5 @@ export const actionByType = (type: EventType, outcome: ShotOutcome | null): Acti
 export const TERM_ES: Record<string, string> = {
   goal: 'Goles', miss: 'Tiros fallados', turnover: 'Pérdidas', save: 'Paradas',
   steal: 'Recuperaciones', block: 'Blocajes', foul: 'Faltas',
-  twoMinutes: "Exclusiones 2′", redCard: 'Tarjeta roja',
+  twoMinutes: "Exclusiones 2′", redCard: 'Tarjeta roja', plusMinus: 'Diferencial ±',
 };
