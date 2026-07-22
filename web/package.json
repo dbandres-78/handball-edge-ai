@@ -1,0 +1,51 @@
+{
+  "name": "handball-edge-ai-web",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "test:lib": "tsx test/live-stats.test.ts",
+    "test:render": "tsx test/ffmpeg-render.test.ts",
+    "test:db": "tsx test/pg-repo.test.ts",
+    "test:live": "tsx test/live-mode.test.ts",
+    "test:zones": "tsx test/shot-origin.test.ts",
+    "test:backup": "tsx test/backup.test.ts",
+    "test:gk": "tsx test/goalkeeper-change.test.ts",
+    "test:pg-persist": "tsx test/pg-persistence.test.ts",
+    "test:xg": "tsx test/xg.test.ts",
+    "test:video": "tsx test/video-upload.test.ts",
+    "test:core": "tsx test/core-barrel.test.ts",
+    "test:ingest": "tsx test/ingest-bridge.test.ts",
+    "test": "npm run test:lib && npm run test:db && npm run test:live && npm run test:zones && npm run test:backup && npm run test:render && npm run test:gk && npm run test:pg-persist && npm run test:xg && npm run test:video && npm run test:core && npm run test:ingest && npm run test:id && npm run test:pm && npm run test:sub",
+    "typecheck:lib": "tsc -p tsconfig.lib.json --noEmit",
+    "verify:pg": "tsx scripts/verify-real-pg.ts",
+    "import:j24": "tsx scripts/e2e-import-pg.ts",
+    "test:id": "tsx test/match-id.test.ts",
+    "test:pm": "tsx test/plus-minus.test.ts",
+    "test:sub": "tsx test/substitution.test.ts",
+    "verify:sub": "tsx scripts/verify-sub-pg.ts"
+  },
+  "dependencies": {
+    "next": "^14.2.5",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "lucide-react": "^0.400.0",
+    "clsx": "^2.1.1",
+    "tailwind-merge": "^2.4.0",
+    "pg": "^8.13.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/pg": "^8.11.0",
+    "pg-mem": "^3.0.0",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "autoprefixer": "^10.4.19",
+    "postcss": "^8.4.40",
+    "tailwindcss": "^3.4.7",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}
