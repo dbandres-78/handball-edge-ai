@@ -1,5 +1,8 @@
 # Postgres local en Windows — guía de instalación y conexión
 
+> **¿Estás en Mac?** Usa **MACOS.md**, que cubre Postgres y además ffmpeg (el que corta los
+> clips) y el comando de diagnóstico `npm run doctor`. Esta guía es solo para Windows.
+
 Objetivo: que la plataforma guarde los partidos en un PostgreSQL instalado en tu propio
 ordenador, en lugar de la memoria (que se pierde al cerrar). Uso local, sin nube.
 

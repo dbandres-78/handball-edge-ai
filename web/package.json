@@ -25,7 +25,8 @@
     "test:id": "tsx test/match-id.test.ts",
     "test:pm": "tsx test/plus-minus.test.ts",
     "test:sub": "tsx test/substitution.test.ts",
-    "verify:sub": "tsx scripts/verify-sub-pg.ts"
+    "verify:sub": "tsx scripts/verify-sub-pg.ts",
+    "doctor": "tsx scripts/doctor.ts"
   },
   "dependencies": {
     "next": "^14.2.5",
