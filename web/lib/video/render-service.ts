@@ -28,8 +28,16 @@ export interface RenderJob {
   error?: string;
 }
 
-/** COSTURA de infraestructura: en producción esto es Redis/BullMQ + almacenamiento de objetos. */
-const jobs = new Map<string, RenderJob>();
+/**
+ * COSTURA de infraestructura: en producción esto es Redis/BullMQ + almacenamiento de objetos.
+ *
+ * El Map se respalda en globalThis para que sea un ÚNICO singleton en todo el proceso del
+ * servidor. Sin esto, en Next (dev con recompilación por ruta, o serverless) cada ruta HTTP
+ * acababa con su propia copia del Map: el POST que crea el job y el GET que consulta su estado
+ * miraban listas distintas → el GET devolvía 404 y la barra de render giraba para siempre.
+ */
+const globalForJobs = globalThis as unknown as { __renderJobs?: Map<string, RenderJob> };
+const jobs: Map<string, RenderJob> = (globalForJobs.__renderJobs ??= new Map<string, RenderJob>());
 const RENDER_ROOT = process.env.RENDER_DIR ?? join(process.cwd(), '.data', 'renders');
 
 const safe = (s: string) => s.replace(/[^\w.-]+/g, '_').slice(0, 40) || 'clip';
