@@ -48,6 +48,36 @@ CREATE TABLE IF NOT EXISTS match_read_model (
   players    jsonb NOT NULL,
   updated_at timestamptz NOT NULL DEFAULT now()
 );
+
+-- ── Catálogo persistente (Fase A) ────────────────────────────────────────────
+-- Temporadas independientes: cada una es su propio "bucket". La estadística
+-- acumulada nunca mezcla temporadas.
+CREATE TABLE IF NOT EXISTS season (
+  code       text PRIMARY KEY,          -- '26/27'
+  label      text,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+-- El club persiste ENTRE temporadas (misma identidad de club año tras año).
+CREATE TABLE IF NOT EXISTS club (
+  id         text PRIMARY KEY,
+  name       text NOT NULL,
+  short_name text,
+  color      text,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+-- La plantilla es POR temporada: un jugador pertenece a un club en una temporada
+-- concreta, con su dorsal de esa temporada. (club_id, season) acota su pertenencia.
+CREATE TABLE IF NOT EXISTS roster_player (
+  id       text PRIMARY KEY,
+  club_id  text NOT NULL,
+  season   text NOT NULL,               -- referencia lógica a season.code
+  number   int  NOT NULL,
+  name     text NOT NULL,
+  position text,
+  active   boolean NOT NULL DEFAULT true
+);
 `;
 
 /**
