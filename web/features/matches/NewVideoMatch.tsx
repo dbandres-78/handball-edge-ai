@@ -13,9 +13,9 @@ import { PALETTE as C, MONO } from '@/lib/theme';
 
 interface Club { id: string; name: string }
 interface RosterRow { number: number; name: string; gk: boolean; playerId?: string }
-interface SideState { clubId: string | null; clubName: string; roster: RosterRow[]; loading: boolean }
+interface SideState { clubId: string | null; clubName: string; isNew: boolean; roster: RosterRow[]; loading: boolean }
 
-const emptySide = (): SideState => ({ clubId: null, clubName: '', roster: [], loading: false });
+const emptySide = (): SideState => ({ clubId: null, clubName: '', isNew: false, roster: [], loading: false });
 const NEW_CLUB = '__new__';
 
 export function NewVideoMatch() {
@@ -44,10 +44,11 @@ export function NewVideoMatch() {
   }, [season]);
 
   const pickClub = async (setSide: (u: (s: SideState) => SideState) => void, value: string) => {
-    if (value === NEW_CLUB) { setSide(() => ({ clubId: null, clubName: '', roster: [blankRow(1, true)], loading: false })); return; }
+    if (value === '') { setSide(() => emptySide()); return; }
+    if (value === NEW_CLUB) { setSide(() => ({ clubId: null, clubName: '', isNew: true, roster: [blankRow(1, true)], loading: false })); return; }
     const club = clubs.find((c) => c.id === value);
     if (!club) return;
-    setSide((s) => ({ ...s, clubId: club.id, clubName: club.name, loading: true }));
+    setSide((s) => ({ ...s, clubId: club.id, clubName: club.name, isNew: false, loading: true }));
     const roster = await loadRoster(club.id);
     setSide((s) => ({ ...s, roster: roster.length ? roster : [blankRow(1, true)], loading: false }));
   };
@@ -181,7 +182,7 @@ function TeamPanel({ title, color, side, setSide, clubs, onPickClub }: {
   const addRow = () => setSide((s) => ({ ...s, roster: [...s.roster, blankRow(nextNumber(s.roster), false)] }));
   const delRow = (i: number) => setSide((s) => ({ ...s, roster: s.roster.filter((_, j) => j !== i) }));
 
-  const selectValue = side.clubId ?? (side.clubName ? NEW_CLUB : '');
+  const selectValue = side.isNew ? NEW_CLUB : (side.clubId ?? '');
 
   return (
     <div className="rounded-lg p-3" style={{ background: C.panel2, border: `1px solid ${C.line}` }}>
@@ -196,7 +197,7 @@ function TeamPanel({ title, color, side, setSide, clubs, onPickClub }: {
         <option value={NEW_CLUB}>➕ Club nuevo…</option>
       </select>
 
-      {(selectValue === NEW_CLUB || (!side.clubId && side.clubName)) && (
+      {side.isNew && (
         <input autoFocus value={side.clubName} onChange={(e) => setSide((s) => ({ ...s, clubName: e.target.value }))}
           placeholder="Nombre del club nuevo" style={{ ...inputStyle, marginBottom: 8 }} />
       )}
