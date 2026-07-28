@@ -9,13 +9,16 @@ export async function GET() {
   return NextResponse.json({ items });
 }
 
+interface RosterInput { number: number; name: string; gk?: boolean; playerId?: string }
+interface SideInput { name?: string; count?: number; clubId?: string; players?: RosterInput[] }
 interface CreateBody {
   competition?: string;
   matchday?: number;
   mode?: CaptureMode;
   periodMinutes?: number;
-  home?: { name?: string; count?: number };
-  away?: { name?: string; count?: number };
+  season?: string;
+  home?: SideInput;
+  away?: SideInput;
 }
 
 /**
@@ -39,13 +42,21 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Faltan los nombres de los equipos' }, { status: 400 });
   }
 
+  // Si el lado trae plantilla real (flujo "Nuevo partido de vídeo"), se usa tal cual —con sus
+  // enlaces al catálogo—; si no, se cae a la plantilla genérica (flujo directo/rápido).
+  const sideRoster = (s?: SideInput) =>
+    s?.players && s.players.length
+      ? s.players.map((p) => ({ number: p.number, name: p.name, gk: !!p.gk, playerId: p.playerId }))
+      : defaultRoster(s?.count ?? 16);
+
   const match = await (await getMatchesRepo()).create({
     competition: body?.competition?.trim() || undefined,
     matchday: body?.matchday,
     mode: body?.mode === 'live' ? 'live' : 'video',
     periodMinutes: body?.periodMinutes ?? 30,
-    home: { name: homeName, players: defaultRoster(body?.home?.count ?? 16) },
-    away: { name: awayName, players: defaultRoster(body?.away?.count ?? 16) },
+    season: body?.season?.trim() || undefined,
+    home: { name: homeName, clubId: body?.home?.clubId, players: sideRoster(body?.home) },
+    away: { name: awayName, clubId: body?.away?.clubId, players: sideRoster(body?.away) },
   });
 
   return NextResponse.json({ ok: true, matchId: match.matchId, mode: match.mode }, { status: 201 });

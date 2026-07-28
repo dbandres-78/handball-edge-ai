@@ -3,6 +3,7 @@ import { Radio, Film } from 'lucide-react';
 import { PALETTE as C, MONO } from '@/lib/theme';
 import type { MatchListItem, MatchStatus } from './types';
 import { NewLiveMatch } from './NewLiveMatch';
+import { NewVideoMatch } from './NewVideoMatch';
 import { ImportReport } from './ImportReport';
 
 const STATUS: Record<MatchStatus, { label: string; color: string }> = {
@@ -19,6 +20,7 @@ export function MatchLibrary({ items }: { items: MatchListItem[] }) {
         <div className="flex items-center gap-3">
           <span style={{ fontFamily: MONO, fontSize: 12, color: C.faint }}>{items.length} partidos</span>
           <ImportReport />
+          <NewVideoMatch />
           <NewLiveMatch />
         </div>
       </div>
