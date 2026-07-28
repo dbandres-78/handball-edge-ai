@@ -40,4 +40,6 @@ export interface LoadedMatch {
   videoRef?: string | null;
   /** Minutos por parte (solo relevante en directo, para el reloj). */
   periodMinutes?: number;
+  /** Temporada a la que pertenece el partido (código, p.ej. '26/27'). Enlaza con el catálogo. */
+  season?: string;
 }

@@ -8,13 +8,15 @@ CREATE TABLE IF NOT EXISTS match (
   status      text NOT NULL DEFAULT 'new',
   mode        text NOT NULL DEFAULT 'video',
   period_minutes int,
-  video_ref   text
+  video_ref   text,
+  season      text
 );
 
 CREATE TABLE IF NOT EXISTS team (
   match_id text NOT NULL,
   side     text NOT NULL,
   name     text NOT NULL,
+  club_id  text,
   PRIMARY KEY (match_id, side)
 );
 
@@ -25,6 +27,7 @@ CREATE TABLE IF NOT EXISTS player (
   name     text NOT NULL,
   gk       boolean NOT NULL DEFAULT false,
   starter  boolean NOT NULL DEFAULT true,
+  player_id text,
   PRIMARY KEY (match_id, side, number)
 );
 

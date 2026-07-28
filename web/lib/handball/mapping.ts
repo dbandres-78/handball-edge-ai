@@ -3,8 +3,8 @@ import type { ResolvedRoster, ResolvedPlayer, ResolvedTeam, MatchSummary, Player
 
 export type Side = 'HOME' | 'AWAY';
 
-export interface UiPlayer { number: number; name: string; gk?: boolean; starter?: boolean }
-export interface UiTeam { name: string; players: UiPlayer[] }
+export interface UiPlayer { number: number; name: string; gk?: boolean; starter?: boolean; /** id en el catálogo (roster_player) si el jugador viene de una plantilla persistente. */ playerId?: string }
+export interface UiTeam { name: string; players: UiPlayer[]; /** id del club en el catálogo, si este lado es un club persistente. */ clubId?: string }
 export interface UiEvent {
   id: number; t: number; period: number; side: Side;
   playerNumber: number | null; type: EventType; outcome: ShotOutcome | null; zone: number | null;

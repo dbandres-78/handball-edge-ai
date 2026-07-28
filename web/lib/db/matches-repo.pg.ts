@@ -2,7 +2,7 @@ import type { UiEvent, UiTeam, Side } from '../handball/mapping';
 import { EventType, ShotOrigin, ShotOutcome, liveStats } from '../handball/mapping';
 import type { CaptureMode, LoadedMatch, MatchListItem, MatchStatus } from '../../features/matches/types';
 import type { CreateMatchInput, MatchesRepository } from '../../features/matches/repository';
-import { toListItem, newMatchId } from '../../features/matches/repository';
+import { toListItem, newMatchId, mergeTeamLinks } from '../../features/matches/repository';
 import { cloneSeed } from '../../features/matches/seed-data';
 import { migrate } from './migrate';
 import { getPool, asJson, type Queryable } from './pg';
@@ -62,18 +62,18 @@ export function makePgMatchesRepository(db: Queryable): PgMatchesRepository {
 
   async function insertMatch(m: LoadedMatch): Promise<void> {
     await db.query(
-      `INSERT INTO match(id, competition, matchday, played_at, status, mode, period_minutes, video_ref)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+      `INSERT INTO match(id, competition, matchday, played_at, status, mode, period_minutes, video_ref, season)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
       [m.matchId, m.competition ?? null, m.matchday ?? null, m.playedAt ?? null, m.status,
-       m.mode, m.periodMinutes ?? null, m.videoRef ?? null],
+       m.mode, m.periodMinutes ?? null, m.videoRef ?? null, m.season ?? null],
     );
     for (const side of SIDES) {
       const team = side === 'HOME' ? m.home : m.away;
-      await db.query('INSERT INTO team(match_id, side, name) VALUES ($1,$2,$3)', [m.matchId, side, team.name]);
+      await db.query('INSERT INTO team(match_id, side, name, club_id) VALUES ($1,$2,$3,$4)', [m.matchId, side, team.name, team.clubId ?? null]);
       for (const p of team.players) {
         await db.query(
-          'INSERT INTO player(match_id, side, number, name, gk, starter) VALUES ($1,$2,$3,$4,$5,$6)',
-          [m.matchId, side, p.number, p.name, !!p.gk, p.starter ?? true],
+          'INSERT INTO player(match_id, side, number, name, gk, starter, player_id) VALUES ($1,$2,$3,$4,$5,$6,$7)',
+          [m.matchId, side, p.number, p.name, !!p.gk, p.starter ?? true, p.playerId ?? null],
         );
       }
     }
@@ -96,7 +96,8 @@ export function makePgMatchesRepository(db: Queryable): PgMatchesRepository {
 
       const teamOf = (side: Side): UiTeam => ({
         name: teams.find((t) => t.side === side)?.name ?? side,
-        players: gkFirst(players.filter((p) => p.side === side).map((p) => ({ number: p.number, name: p.name, gk: !!p.gk, starter: !!p.starter }))),
+        clubId: teams.find((t) => t.side === side)?.club_id ?? undefined,
+        players: gkFirst(players.filter((p) => p.side === side).map((p) => ({ number: p.number, name: p.name, gk: !!p.gk, starter: !!p.starter, playerId: p.player_id ?? undefined }))),
       });
 
       return {
@@ -111,6 +112,7 @@ export function makePgMatchesRepository(db: Queryable): PgMatchesRepository {
         mode: (mrow.mode ?? 'video') as CaptureMode,
         periodMinutes: mrow.period_minutes ?? undefined,
         videoRef: mrow.video_ref ?? null,
+        season: mrow.season ?? undefined,
       };
     },
 
@@ -121,6 +123,7 @@ export function makePgMatchesRepository(db: Queryable): PgMatchesRepository {
         playedAt: input.playedAt ?? new Date().toISOString(),
         home: input.home, away: input.away, events: [], status: 'new',
         mode: input.mode, periodMinutes: input.periodMinutes, videoRef: null,
+        season: input.season,
       };
       await insertMatch(match);
       return match;
@@ -145,13 +148,22 @@ export function makePgMatchesRepository(db: Queryable): PgMatchesRepository {
     async saveRoster(matchId, home, away) {
       // Reescribe plantillas y alineación (starter). Los eventos referencian el dorsal, no una FK,
       // así que borrar y reinsertar jugadores es seguro y mantiene una única fuente de verdad.
-      for (const [side, team] of [['HOME', home], ['AWAY', away]] as const) {
-        await db.query('UPDATE team SET name=$1 WHERE match_id=$2 AND side=$3', [team.name, matchId, side]);
+      // Preserva los enlaces al catálogo (club_id, player_id) si el UiTeam entrante no los trae.
+      for (const [side, incoming] of [['HOME', home], ['AWAY', away]] as const) {
+        const existingTeam = (await db.query('SELECT club_id FROM team WHERE match_id=$1 AND side=$2', [matchId, side])).rows[0];
+        const existingPlayers = (await db.query('SELECT number, player_id FROM player WHERE match_id=$1 AND side=$2', [matchId, side])).rows;
+        const existing: UiTeam = {
+          name: incoming.name,
+          clubId: existingTeam?.club_id ?? undefined,
+          players: existingPlayers.map((r) => ({ number: r.number, name: '', playerId: r.player_id ?? undefined })),
+        };
+        const team = mergeTeamLinks(existing, incoming);
+        await db.query('UPDATE team SET name=$1, club_id=$2 WHERE match_id=$3 AND side=$4', [team.name, team.clubId ?? null, matchId, side]);
         await db.query('DELETE FROM player WHERE match_id=$1 AND side=$2', [matchId, side]);
         for (const p of team.players) {
           await db.query(
-            'INSERT INTO player(match_id, side, number, name, gk, starter) VALUES ($1,$2,$3,$4,$5,$6)',
-            [matchId, side, p.number, p.name, !!p.gk, p.starter ?? true],
+            'INSERT INTO player(match_id, side, number, name, gk, starter, player_id) VALUES ($1,$2,$3,$4,$5,$6,$7)',
+            [matchId, side, p.number, p.name, !!p.gk, p.starter ?? true, p.playerId ?? null],
           );
         }
       }

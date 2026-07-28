@@ -11,10 +11,28 @@ export interface CreateMatchInput {
   competition?: string;
   matchday?: number;
   playedAt?: string;
-  home: { name: string; players: LoadedMatch['home']['players'] };
-  away: { name: string; players: LoadedMatch['away']['players'] };
+  /** Temporada del partido (código del catálogo, p.ej. '26/27'). */
+  season?: string;
+  /** UiTeam permite arrastrar clubId (equipo) y playerId (jugadores) del catálogo. */
+  home: UiTeam;
+  away: UiTeam;
   mode: CaptureMode;
   periodMinutes?: number;
+}
+
+/**
+ * Al reguardar la plantilla desde la sala, preserva los enlaces al catálogo (clubId del equipo
+ * y playerId por dorsal) si el UiTeam entrante no los trae. Evita que el autosave de la sala
+ * borre los enlaces persistentes (base de la estadística acumulada de la Fase C).
+ */
+export function mergeTeamLinks(existing: UiTeam | undefined, incoming: UiTeam): UiTeam {
+  if (!existing) return incoming;
+  const byNumber = new Map(existing.players.map((p) => [p.number, p.playerId]));
+  return {
+    ...incoming,
+    clubId: incoming.clubId ?? existing.clubId,
+    players: incoming.players.map((p) => ({ ...p, playerId: p.playerId ?? byNumber.get(p.number) })),
+  };
 }
 
 export interface MatchesRepository {
@@ -66,6 +84,7 @@ export const inMemoryMatchesRepo: MatchesRepository = {
       playedAt: input.playedAt ?? new Date().toISOString(),
       home: input.home, away: input.away, events: [], status: 'new',
       mode: input.mode, videoRef: null, periodMinutes: input.periodMinutes,
+      season: input.season,
     };
     store.set(match.matchId, match);
     return match;
@@ -79,7 +98,7 @@ export const inMemoryMatchesRepo: MatchesRepository = {
   async saveRoster(matchId, home, away) {
     seed();
     const m = store.get(matchId);
-    if (m) store.set(matchId, { ...m, home, away });
+    if (m) store.set(matchId, { ...m, home: mergeTeamLinks(m.home, home), away: mergeTeamLinks(m.away, away) });
   },
   async markExtracted(matchId) {
     seed();

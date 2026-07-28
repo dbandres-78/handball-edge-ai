@@ -22,6 +22,15 @@ const MIGRATIONS: Array<{ version: number; description: string; sql: string }> =
       ALTER TABLE match ADD COLUMN IF NOT EXISTS video_ref text;
     `,
   },
+  {
+    version: 3,
+    description: 'enlaces al catálogo: season en match, club_id en team, player_id en player',
+    sql: `
+      ALTER TABLE match  ADD COLUMN IF NOT EXISTS season    text;
+      ALTER TABLE team   ADD COLUMN IF NOT EXISTS club_id   text;
+      ALTER TABLE player ADD COLUMN IF NOT EXISTS player_id text;
+    `,
+  },
 ];
 
 /** Aplica el esquema base + migraciones incrementales. Idempotente. */
