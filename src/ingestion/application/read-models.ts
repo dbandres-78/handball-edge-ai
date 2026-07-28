@@ -79,6 +79,7 @@ export interface TeamSummary {
   turnovers: number;
   steals: number;
   blocks: number;
+  nearPasses: number;           // pases a 10 m en ataque (volumen); ataque cercano / defensa permisiva
   twoMinutes: number;
   yellowCards: number;
   redCards: number;

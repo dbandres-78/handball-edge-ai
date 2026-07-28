@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { ListOrdered, BarChart3, Save, Download, ArrowLeft, Radio } from 'lucide-react';
 import { PALETTE as C, MONO } from '@/lib/theme';
 import { fmt } from '@/lib/handball/format';
-import { ActionDef } from '@/lib/handball/actions';
+import { ActionDef, ACTIONS } from '@/lib/handball/actions';
 import { EventType, ShotOrigin, ShotOutcome, UiEvent, UiTeam, Side, liveStats } from '@/lib/handball/mapping';
 import type { LoadedMatch } from '@/features/matches/types';
 import { TagPanel } from '@/features/analysis/TagPanel';
@@ -16,6 +16,11 @@ import { useMatchClock } from './useMatchClock';
 import { useMatchPersistence } from './useMatchPersistence';
 import { LiveClock } from './LiveClock';
 import { SyncBadge, RecoveryBanner } from './SyncBadge';
+
+/** Color distinto al de local/visitante y al ámbar del reloj, para que la tecla destaque. */
+const VIOLET = '#8b5cf6';
+/** Acción de pase a 10 m (evento de equipo). La barra espaciadora es el reloj; Shift suma esto. */
+const NEAR_PASS_ACTION = ACTIONS.find((a) => a.type === EventType.NEAR_PASS)!;
 
 /**
  * Sala de DIRECTO. Misma capa canónica de eventos, mismo recompute y mismo Play Score que la
@@ -79,6 +84,20 @@ export function LiveRoom({ match }: { match: LoadedMatch }) {
     // El tiempo muerto para el reloj: es la razón por la que el reloj se detiene en balonmano.
     if (a.type === EventType.TIMEOUT && clock.running) clock.pause();
     doFlash(`${a.label} · ${a.teamOnly ? (side === 'HOME' ? home.name : away.name) : '#' + player} · ${fmt(t)}`);
+  };
+
+  // Pase a 10 m: evento de EQUIPO que se suma al equipo seleccionado como atacante (`side`).
+  // Reutiliza tag() para no duplicar (persistencia, orden, flash) y mantener la paridad.
+  const recordNearPass = () => tag(NEAR_PASS_ACTION);
+
+  // −1: quita el último pase a 10 m del equipo que ataca, para corregir una pulsación de más.
+  const undoNearPass = () => {
+    const last = [...events].reverse().find((e) => e.type === EventType.NEAR_PASS && e.side === side);
+    if (!last) return;
+    const next = events.filter((e) => e.id !== last.id);
+    setEvents(next);
+    void persistence.record(next);
+    doFlash(`Pase a 10m −1 · ${side === 'HOME' ? home.name : away.name}`);
   };
 
   const onGkChange = (s: Side, number: number) => {
@@ -156,12 +175,20 @@ export function LiveRoom({ match }: { match: LoadedMatch }) {
     doFlash('NormalizedMatch exportado');
   };
 
-  // Espacio = arrancar/parar el reloj.
+  // Barra espaciadora = arrancar/parar reloj (lo ágil para el tiempo).
+  // Shift (⇧, izquierda o derecha) = +1 pase a 10 m al equipo que ataca (`side`).
+  // Un ref siempre-actual evita re-suscribir el listener en cada evento.
+  const nearPassRef = useRef<() => void>(() => {});
+  useEffect(() => { nearPassRef.current = recordNearPass; });
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const tg = e.target as HTMLElement;
       if (tg && (tg.tagName === 'INPUT' || tg.tagName === 'TEXTAREA')) return;
-      if (e.code === 'Space') { e.preventDefault(); clock.toggle(); }
+      if (e.code === 'Space') { e.preventDefault(); clock.toggle(); return; }
+      if ((e.code === 'ShiftLeft' || e.code === 'ShiftRight') && !e.repeat) {
+        e.preventDefault();
+        nearPassRef.current();
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -213,6 +240,42 @@ export function LiveRoom({ match }: { match: LoadedMatch }) {
             homeName={home.name} awayName={away.name}
             homeGoals={stats.summary.home.goals} awayGoals={stats.summary.away.goals}
           />
+
+          {/* ── TECLA DE PASES A 10 M ─────────────────────────────────────────
+              Suma al equipo que atacas (side). Se acciona con Shift (⇧) o con +1.
+              Color morado para destacar sobre local/visitante y el ámbar del reloj. */}
+          <div className="px-6 pb-5">
+            <div className="rounded-xl p-3" style={{ background: `${VIOLET}14`, border: `1.5px solid ${VIOLET}` }}>
+              <div className="flex items-center justify-between mb-2">
+                <span style={{ fontFamily: MONO, fontSize: 11, letterSpacing: 1, color: VIOLET, fontWeight: 700 }}>PASES A 10 M · ATAQUE</span>
+                <span style={{ fontSize: 10, color: C.muted }}>⇧ Mayús suma al equipo que atacas</span>
+              </div>
+              <div className="flex items-stretch gap-2">
+                <div className="flex-1 rounded-lg py-1.5 text-center min-w-0"
+                  style={{ background: side === 'HOME' ? `${C.home}22` : C.panel2, border: `1px solid ${side === 'HOME' ? C.home : C.line}` }}>
+                  <div className="truncate px-1" style={{ fontSize: 10, color: C.muted }}>{home.name}</div>
+                  <div style={{ fontFamily: MONO, fontSize: 26, fontWeight: 700, color: side === 'HOME' ? C.home : C.text }}>{stats.summary.home.nearPasses}</div>
+                </div>
+                <button onClick={recordNearPass} className="px-5 rounded-lg flex flex-col items-center justify-center"
+                  style={{ background: VIOLET, color: '#0E1420', fontWeight: 800, minWidth: 92 }}>
+                  <span style={{ fontSize: 22, lineHeight: 1 }}>+1</span>
+                  <span style={{ fontSize: 10, fontWeight: 600 }}>PASE 10M</span>
+                </button>
+                <div className="flex-1 rounded-lg py-1.5 text-center min-w-0"
+                  style={{ background: side === 'AWAY' ? `${C.away}22` : C.panel2, border: `1px solid ${side === 'AWAY' ? C.away : C.line}` }}>
+                  <div className="truncate px-1" style={{ fontSize: 10, color: C.muted }}>{away.name}</div>
+                  <div style={{ fontFamily: MONO, fontSize: 26, fontWeight: 700, color: side === 'AWAY' ? C.away : C.text }}>{stats.summary.away.nearPasses}</div>
+                </div>
+                <button onClick={undoNearPass} title="Quitar el último pase a 10 m del equipo que atacas"
+                  className="px-3 rounded-lg" style={{ background: C.panel3, color: C.muted, border: `1px solid ${C.line}`, fontFamily: MONO, fontSize: 16 }}>
+                  −1
+                </button>
+              </div>
+              <div className="mt-1.5 text-center" style={{ fontSize: 10, color: C.faint }}>
+                Atacas: <b style={{ color: side === 'HOME' ? C.home : C.away }}>{side === 'HOME' ? home.name : away.name}</b> · cámbialo en el panel de anotación
+              </div>
+            </div>
+          </div>
           {flash && (
             <div className="absolute left-4 bottom-4 px-3 py-1.5 rounded-md text-sm" style={{ background: C.panel2, border: `1px solid ${C.line}`, fontFamily: MONO }}>
               {flash}

@@ -72,6 +72,7 @@ export function StatsPanel(p: Props) {
         <Metric label="PÉRD." value={s.turnovers} />
         <Metric label="RECUP." value={s.steals} />
         <Metric label="BLOCAJES" value={s.blocks} />
+        <Metric label="PASES 10M" value={s.nearPasses} />
         <Metric label="EXCL. 2′" value={s.twoMinutes} />
         <Metric label="T.M." value={s.timeouts} />
       </div>

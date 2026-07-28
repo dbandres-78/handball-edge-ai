@@ -8,6 +8,7 @@ export enum EventType {
   TURNOVER = 'TURNOVER',         // pérdida
   STEAL = 'STEAL',               // recuperación
   FOUL = 'FOUL',                 // falta
+  NEAR_PASS = 'NEAR_PASS',       // pase a 10 m en ataque (evento de EQUIPO, sin jugador); volumen
   TWO_MINUTES = 'TWO_MINUTES',   // exclusión 2'
   YELLOW_CARD = 'YELLOW_CARD',   // amonestación
   RED_CARD = 'RED_CARD',         // descalificación

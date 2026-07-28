@@ -55,6 +55,7 @@ export function recomputeAggregates(
   const teamTurnovers = new Map<string, number>();
   const teamSteals = new Map<string, number>();
   const teamBlocks = new Map<string, number>();
+  const teamNearPasses = new Map<string, number>();
   const teamTwoMin = new Map<string, number>();
   const teamYellow = new Map<string, number>();
   const teamRed = new Map<string, number>();
@@ -66,7 +67,7 @@ export function recomputeAggregates(
   const teamGoalZones = new Map<string, Partial<Record<number, number>>>();
   for (const t of roster.teams) { teamOrigins.set(t.teamId, {}); teamGoalZones.set(t.teamId, {}); }
   for (const t of roster.teams) {
-    for (const m of [teamGoals, teamSaves, teamTurnovers, teamSteals, teamBlocks, teamTwoMin, teamYellow, teamRed, teamTimeouts, teamShots, teamXg, teamXgot]) {
+    for (const m of [teamGoals, teamSaves, teamTurnovers, teamSteals, teamBlocks, teamNearPasses, teamTwoMin, teamYellow, teamRed, teamTimeouts, teamShots, teamXg, teamXgot]) {
       m.set(t.teamId, 0);
     }
   }
@@ -168,6 +169,7 @@ export function recomputeAggregates(
       }
       case EventType.TURNOVER: if (acc) acc.turnovers++; inc(teamTurnovers, ev.teamId); break;
       case EventType.STEAL:    if (acc) acc.steals++;    inc(teamSteals, ev.teamId); break;
+      case EventType.NEAR_PASS: inc(teamNearPasses, ev.teamId); break;   // evento de equipo, sin jugador
       case EventType.FOUL:     if (acc) acc.fouls++; break;
       case EventType.TWO_MINUTES: if (acc) acc.twoMinutes++; inc(teamTwoMin, ev.teamId); break;
       case EventType.YELLOW_CARD: if (acc) acc.yellowCards++; inc(teamYellow, ev.teamId); break;
@@ -197,6 +199,7 @@ export function recomputeAggregates(
       turnovers: teamTurnovers.get(t.teamId) ?? 0,
       steals: teamSteals.get(t.teamId) ?? 0,
       blocks: teamBlocks.get(t.teamId) ?? 0,
+      nearPasses: teamNearPasses.get(t.teamId) ?? 0,
       twoMinutes: teamTwoMin.get(t.teamId) ?? 0,
       yellowCards: teamYellow.get(t.teamId) ?? 0,
       redCards: teamRed.get(t.teamId) ?? 0,

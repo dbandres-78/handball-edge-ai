@@ -20,6 +20,7 @@ export const ACTIONS: ActionDef[] = [
   { key: 'BLOC',   label: 'Blocado',       type: EventType.SHOT, outcome: ShotOutcome.BLOCKED, shot: true, tone: 'miss' },
   { key: 'PERD',   label: 'Pérdida',       type: EventType.TURNOVER,     tone: 'neg' },
   { key: 'RECUP',  label: 'Recuperación',  type: EventType.STEAL,        tone: 'pos' },
+  { key: 'PASE10', label: 'Pase a 10m',    type: EventType.NEAR_PASS, teamOnly: true, tone: 'neutral' },
   { key: 'FALTA',  label: 'Falta',         type: EventType.FOUL,         tone: 'neutral' },
   { key: 'EXCL',   label: "Exclusión 2′",  type: EventType.TWO_MINUTES,  tone: 'warn' },
   { key: 'AMAR',   label: 'Amarilla',      type: EventType.YELLOW_CARD,  tone: 'warn' },
@@ -36,5 +37,6 @@ export const actionByType = (type: EventType, outcome: ShotOutcome | null): Acti
 export const TERM_ES: Record<string, string> = {
   goal: 'Goles', miss: 'Tiros fallados', turnover: 'Pérdidas', save: 'Paradas',
   steal: 'Recuperaciones', block: 'Blocajes', foul: 'Faltas',
+  nearPasses: 'Pases a 10m',
   twoMinutes: "Exclusiones 2′", redCard: 'Tarjeta roja', plusMinus: 'Diferencial ±',
 };
