@@ -5,6 +5,7 @@ import type { MatchListItem, MatchStatus } from './types';
 import { NewLiveMatch } from './NewLiveMatch';
 import { NewVideoMatch } from './NewVideoMatch';
 import { ImportReport } from './ImportReport';
+import { DeleteMatchButton } from './DeleteMatchButton';
 
 const STATUS: Record<MatchStatus, { label: string; color: string }> = {
   new: { label: 'Sin analizar', color: C.faint },
@@ -32,7 +33,8 @@ export function MatchLibrary({ items }: { items: MatchListItem[] }) {
         {items.map((m) => {
           const st = STATUS[m.status];
           return (
-            <Link key={m.matchId} href={m.mode === 'live' ? `/matches/${m.matchId}/live` : `/matches/${m.matchId}/analyze`}
+            <div key={m.matchId} className="relative group">
+            <Link href={m.mode === 'live' ? `/matches/${m.matchId}/live` : `/matches/${m.matchId}/analyze`}
               className="block rounded-lg p-4 transition-colors" style={{ background: C.panel, border: `1px solid ${C.line}` }}>
               <div className="flex items-center justify-between mb-3">
                 <span className="flex items-center gap-1.5" style={{ fontSize: 11, color: C.faint }}>
@@ -56,6 +58,8 @@ export function MatchLibrary({ items }: { items: MatchListItem[] }) {
                 </div>
               </div>
             </Link>
+            <DeleteMatchButton matchId={m.matchId} label={`${m.homeName} – ${m.awayName}`} />
+            </div>
           );
         })}
       </div>

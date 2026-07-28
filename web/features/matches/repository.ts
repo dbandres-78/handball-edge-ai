@@ -43,6 +43,7 @@ export interface MatchesRepository {
   saveRoster(matchId: string, home: UiTeam, away: UiTeam): Promise<void>;
   markExtracted(matchId: string): Promise<void>;
   setVideo(matchId: string, videoRef: string): Promise<void>;
+  delete(matchId: string): Promise<void>;
 }
 
 export function toListItem(m: LoadedMatch): MatchListItem {
@@ -109,6 +110,10 @@ export const inMemoryMatchesRepo: MatchesRepository = {
     seed();
     const m = store.get(matchId);
     if (m) store.set(matchId, { ...m, videoRef });
+  },
+  async delete(matchId) {
+    seed();
+    store.delete(matchId);
   },
 };
 
