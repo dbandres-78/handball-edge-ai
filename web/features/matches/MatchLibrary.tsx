@@ -4,7 +4,6 @@ import { PALETTE as C, MONO } from '@/lib/theme';
 import type { MatchListItem, MatchStatus } from './types';
 import { NewLiveMatch } from './NewLiveMatch';
 import { NewVideoMatch } from './NewVideoMatch';
-import { ImportReport } from './ImportReport';
 import { DeleteMatchButton } from './DeleteMatchButton';
 
 const STATUS: Record<MatchStatus, { label: string; color: string }> = {
@@ -20,13 +19,12 @@ export function MatchLibrary({ items }: { items: MatchListItem[] }) {
         <h1 style={{ fontSize: 22, fontWeight: 700, color: C.text }}>Biblioteca de partidos</h1>
         <div className="flex items-center gap-3">
           <span style={{ fontFamily: MONO, fontSize: 12, color: C.faint }}>{items.length} partidos</span>
-          <ImportReport />
           <NewVideoMatch />
           <NewLiveMatch />
         </div>
       </div>
       <p style={{ fontSize: 13, color: C.muted, marginBottom: 20 }}>
-        Analiza vídeo y corta jugadas, anota en directo o importa un informe real. La estadística es la misma en los tres casos.
+        Crea un partido de vídeo con sus plantillas y corta jugadas, o anota en directo. La estadística es la misma en ambos casos, y puedes exportarla a CSV.
       </p>
 
       <div className="grid sm:grid-cols-2 gap-3">

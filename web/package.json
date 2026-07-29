@@ -18,7 +18,7 @@
     "test:video": "tsx test/video-upload.test.ts",
     "test:core": "tsx test/core-barrel.test.ts",
     "test:ingest": "tsx test/ingest-bridge.test.ts",
-    "test": "npm run test:lib && npm run test:db && npm run test:live && npm run test:zones && npm run test:backup && npm run test:render && npm run test:gk && npm run test:pg-persist && npm run test:xg && npm run test:video && npm run test:core && npm run test:ingest && npm run test:id && npm run test:pm && npm run test:sub && npm run test:catalog && npm run test:near && npm run test:catlink && npm run test:del",
+    "test": "npm run test:lib && npm run test:db && npm run test:live && npm run test:zones && npm run test:backup && npm run test:render && npm run test:gk && npm run test:pg-persist && npm run test:xg && npm run test:video && npm run test:core && npm run test:ingest && npm run test:id && npm run test:pm && npm run test:sub && npm run test:catalog && npm run test:near && npm run test:catlink && npm run test:del && npm run test:csv",
     "typecheck:lib": "tsc -p tsconfig.lib.json --noEmit",
     "verify:pg": "tsx scripts/verify-real-pg.ts",
     "import:j24": "tsx scripts/e2e-import-pg.ts",
@@ -29,6 +29,7 @@
     "test:near": "tsx test/near-pass.test.ts",
     "test:catlink": "tsx test/match-catalog-link.test.ts",
     "test:del": "tsx test/delete-match.test.ts",
+    "test:csv": "tsx test/stats-csv.test.ts",
     "verify:sub": "tsx scripts/verify-sub-pg.ts",
     "doctor": "tsx scripts/doctor.ts"
   },

@@ -1,8 +1,9 @@
 'use client';
 import { useMemo } from 'react';
-import { Shield, ChevronRight } from 'lucide-react';
+import { Shield, ChevronRight, Download } from 'lucide-react';
 import { PALETTE as C, MONO } from '@/lib/theme';
 import { TERM_ES } from '@/lib/handball/actions';
+import { buildStatsCsv, statsCsvFilename } from '@/lib/handball/stats-csv';
 import { LiveStats, Side, UiEvent, EventType, ShotOutcome } from '@/lib/handball/mapping';
 import { GoalTarget } from './GoalTarget';
 import { ShotOriginCourt } from './ShotOriginCourt';
@@ -48,8 +49,26 @@ export function StatsPanel(p: Props) {
     </div>
   );
 
+  const exportCsv = () => {
+    const csv = buildStatsCsv(p.stats);
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = statsCsvFilename(p.stats);
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="p-3 flex flex-col gap-3">
+      <button onClick={exportCsv} className="flex items-center justify-center gap-1.5 py-2 rounded-md text-sm"
+        style={{ background: C.goal, color: '#0E1420', fontWeight: 700 }}>
+        <Download size={14} /> Exportar informe (.csv)
+      </button>
+
       <div className="flex rounded-md overflow-hidden" style={{ border: `1px solid ${C.line}` }}>
         {(['HOME', 'AWAY'] as Side[]).map((sd) => (
           <button key={sd} onClick={() => p.setStatTeam(sd)} className="flex-1 py-2 text-sm truncate px-2"
