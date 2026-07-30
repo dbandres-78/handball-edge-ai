@@ -43,6 +43,8 @@ export interface MatchesRepository {
   saveRoster(matchId: string, home: UiTeam, away: UiTeam): Promise<void>;
   markExtracted(matchId: string): Promise<void>;
   setVideo(matchId: string, videoRef: string): Promise<void>;
+  /** Fija la temporada del partido tras crearlo (al promover sus plantillas al catálogo). */
+  setSeason(matchId: string, season: string): Promise<void>;
   delete(matchId: string): Promise<void>;
 }
 
@@ -110,6 +112,11 @@ export const inMemoryMatchesRepo: MatchesRepository = {
     seed();
     const m = store.get(matchId);
     if (m) store.set(matchId, { ...m, videoRef });
+  },
+  async setSeason(matchId, season) {
+    seed();
+    const m = store.get(matchId);
+    if (m) store.set(matchId, { ...m, season });
   },
   async delete(matchId) {
     seed();

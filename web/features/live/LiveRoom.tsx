@@ -299,7 +299,8 @@ export function LiveRoom({ match }: { match: LoadedMatch }) {
                 zone={zone} setZone={setZone} origin={origin} setOrigin={setOrigin} blocker={blocker} setBlocker={setBlocker} isPenalty={isPenalty} setIsPenalty={setIsPenalty}
                 home={home} away={away} setHome={setHome} setAway={setAway}
                 editRoster={editRoster} setEditRoster={setEditRoster} tag={tag} time={clock.seconds}
-                activeGk={activeGk[side]} onGkChange={onGkChange} events={events} recordSub={recordSub} />
+                activeGk={activeGk[side]} onGkChange={onGkChange} events={events} recordSub={recordSub}
+                matchId={match.matchId} season={match.season} onLinkedToCatalog={(h, a) => { setHome(h); setAway(a); }} />
             ) : (
               <StatsPanel stats={stats} statTeam={statTeam} setStatTeam={setStatTeam} expanded={expanded} setExpanded={setExpanded} events={events} />
             )}

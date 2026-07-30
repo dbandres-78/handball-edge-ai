@@ -57,6 +57,22 @@ export async function extractStats(matchId: string): Promise<ExtractResult> {
   return r.json();
 }
 
+export interface SaveToCatalogResult { ok: boolean; season?: string; home?: UiTeam; away?: UiTeam; error?: string }
+/** Vuelca las plantillas del partido al catálogo (reutilizables) y enlaza el partido. */
+export async function saveToCatalog(matchId: string, season: string): Promise<SaveToCatalogResult> {
+  try {
+    const r = await fetch(`/api/matches/${matchId}/catalog`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ season }),
+    });
+    const data = await r.json().catch(() => ({}));
+    return r.ok ? { ok: true, ...data } : { ok: false, error: data.error ?? `Error ${r.status}` };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
+}
+
 export interface UploadResult { ok: boolean; videoRef?: string; durationSec?: number; sizeBytes?: number; error?: string }
 export async function uploadVideo(matchId: string, file: File): Promise<UploadResult> {
   // Enviamos el binario crudo por streaming (el body es el propio File, no FormData).

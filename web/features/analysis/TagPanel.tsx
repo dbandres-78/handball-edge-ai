@@ -1,12 +1,13 @@
 'use client';
 import { useState } from 'react';
-import { Shield, Pencil, X, Plus, ArrowLeftRight } from 'lucide-react';
+import { Shield, Pencil, X, Plus, ArrowLeftRight, BookMarked, Check, Loader2 } from 'lucide-react';
 import { PALETTE as C, MONO } from '@/lib/theme';
 import { fmt } from '@/lib/handball/format';
 import { ACTIONS, ActionDef, Tone } from '@/lib/handball/actions';
 import { UiTeam, Side, ShotOrigin, UiEvent, onCourtAt } from '@/lib/handball/mapping';
 import { GoalTarget } from './GoalTarget';
 import { ShotOriginCourt, ORIGIN_LABEL } from './ShotOriginCourt';
+import { saveToCatalog } from './actions';
 
 const TONE: Record<Tone, string> = { goal: C.goal, save: C.save, miss: C.miss, neg: C.neg, pos: C.pos, warn: C.warn, neutral: C.neutral };
 
@@ -30,6 +31,11 @@ interface Props {
   events?: UiEvent[];
   /** Registra un cambio de jugador de campo: sale `outN`, entra `inN`. Base del ± fino. */
   recordSub?: (side: Side, outN: number, inN: number) => void;
+  /** Id del partido y temporada, para «guardar plantillas en el catálogo» desde la sala. */
+  matchId?: string;
+  season?: string;
+  /** Al enlazar el partido al catálogo, la sala actualiza ambos equipos con los enlaces. */
+  onLinkedToCatalog?: (home: UiTeam, away: UiTeam) => void;
 }
 
 /** Máximo jugadores por equipo (RFEBM). */
@@ -118,6 +124,9 @@ export function TagPanel(p: Props) {
             Define quién está en pista al inicio: es la base del diferencial ± fino. Sin titulares marcados, el ±
             cae al diferencial de equipo.
           </div>
+          {p.matchId && (
+            <SaveToCatalog matchId={p.matchId} defaultSeason={p.season} onLinked={p.onLinkedToCatalog} />
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-4 gap-1.5">
@@ -289,6 +298,61 @@ export function TagPanel(p: Props) {
       </div>
       <div className="text-center" style={{ fontSize: 11, color: C.faint }}>
         Sella en <span style={{ fontFamily: MONO, color: C.amber }}>{fmt(p.time)}</span> · jugador #{p.player} · {team.name}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * «Guardar plantillas en el catálogo»: vuelca club + jugadores actuales del partido al catálogo
+ * (reutilizables) y enlaza el partido. Útil tras empezar en modo Rápido o editar en la sala.
+ */
+function SaveToCatalog({ matchId, defaultSeason, onLinked }: {
+  matchId: string; defaultSeason?: string; onLinked?: (home: UiTeam, away: UiTeam) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [season, setSeason] = useState(defaultSeason || '26/27');
+  const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const run = async () => {
+    setBusy(true); setError(null);
+    const r = await saveToCatalog(matchId, season.trim() || '26/27');
+    setBusy(false);
+    if (!r.ok) { setError(r.error ?? 'No se pudo guardar'); return; }
+    if (r.home && r.away) onLinked?.(r.home, r.away);
+    setDone(true);
+    setTimeout(() => { setDone(false); setOpen(false); }, 1400);
+  };
+
+  if (!open) {
+    return (
+      <button onClick={() => setOpen(true)} className="flex items-center justify-center gap-1.5 py-1.5 rounded-md text-sm mt-1"
+        style={{ background: C.panel2, border: `1px solid ${C.line}`, color: C.text }}>
+        <BookMarked size={13} /> Guardar plantillas en el catálogo
+      </button>
+    );
+  }
+
+  return (
+    <div className="p-2.5 rounded-md mt-1 flex flex-col gap-2" style={{ background: C.panel2, border: `1px solid ${C.amber}66` }}>
+      <div style={{ fontSize: 11, color: C.text }}>
+        Guarda los dos clubes y sus jugadores en el catálogo (reutilizables) y enlaza este partido.
+      </div>
+      <div className="flex items-center gap-2">
+        <span style={{ fontSize: 11, color: C.faint }}>Temporada</span>
+        <input value={season} onChange={(e) => setSeason(e.target.value)}
+          className="px-2 py-1 rounded-md text-sm" style={{ fontFamily: MONO, width: 80, background: C.bg, border: `1px solid ${C.line}`, color: C.text }} />
+      </div>
+      {error && <div style={{ fontSize: 11, color: C.neg }}>{error}</div>}
+      <div className="flex items-center gap-2 justify-end">
+        <button onClick={() => setOpen(false)} className="px-2.5 py-1 rounded-md text-xs" style={{ color: C.muted, border: `1px solid ${C.line}` }}>Cancelar</button>
+        <button onClick={run} disabled={busy || done} className="flex items-center gap-1.5 px-3 py-1 rounded-md text-xs"
+          style={{ background: done ? C.goal : C.amber, color: '#0E1420', fontWeight: 700, opacity: busy ? 0.6 : 1 }}>
+          {busy ? <Loader2 size={12} className="animate-spin" /> : done ? <Check size={12} /> : <BookMarked size={12} />}
+          {busy ? 'Guardando…' : done ? 'Guardado' : 'Guardar'}
+        </button>
       </div>
     </div>
   );

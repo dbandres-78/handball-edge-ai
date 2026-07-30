@@ -187,6 +187,9 @@ export function makePgMatchesRepository(db: Queryable): PgMatchesRepository {
     async setVideo(matchId, videoRef) {
       await db.query('UPDATE match SET video_ref=$2 WHERE id=$1', [matchId, videoRef]);
     },
+    async setSeason(matchId, season) {
+      await db.query('UPDATE match SET season=$2 WHERE id=$1', [matchId, season]);
+    },
     async delete(matchId) {
       // Borra todas las filas del partido. Los eventos son la fuente de verdad; al no haber FKs,
       // se borran explícitamente todas las tablas dependientes antes que match.
@@ -215,6 +218,7 @@ export function createPgMatchesRepo(): MatchesRepository {
     async saveRoster(id, h, a) { await ensure(); return repo.saveRoster(id, h, a); },
     async markExtracted(id) { await ensure(); return repo.markExtracted(id); },
     async setVideo(id, r) { await ensure(); return repo.setVideo(id, r); },
+    async setSeason(id, s) { await ensure(); return repo.setSeason(id, s); },
     async delete(id) { await ensure(); return repo.delete(id); },
   };
 }
