@@ -1,4 +1,4 @@
-import { EventType, MatchEvent, ShotOrigin, ShotOutcome, ShotPayload, SubstitutionPayload } from '../domain/match-event';
+import { AttackPhase, EventType, MatchEvent, ShotOrigin, ShotOutcome, ShotPayload, SubstitutionPayload, TurnoverPayload } from '../domain/match-event';
 import { computePlayScore } from './play-score';
 import { computeXg } from './xg';
 import { MatchSummary, OriginBreakdown, PlayerLine, TeamSummary } from './read-models';
@@ -65,9 +65,15 @@ export function recomputeAggregates(
   const teamXgot = new Map<string, number>();
   const teamOrigins = new Map<string, OriginBreakdown>();
   const teamGoalZones = new Map<string, Partial<Record<number, number>>>();
+  // Posesiones y desglose por fase.
+  const teamPoss = new Map<string, number>();
+  const teamPossPos = new Map<string, number>();
+  const teamPossCounter = new Map<string, number>();
+  const teamGoalsPos = new Map<string, number>();
+  const teamGoalsCounter = new Map<string, number>();
   for (const t of roster.teams) { teamOrigins.set(t.teamId, {}); teamGoalZones.set(t.teamId, {}); }
   for (const t of roster.teams) {
-    for (const m of [teamGoals, teamSaves, teamTurnovers, teamSteals, teamBlocks, teamNearPasses, teamTwoMin, teamYellow, teamRed, teamTimeouts, teamShots, teamXg, teamXgot]) {
+    for (const m of [teamGoals, teamSaves, teamTurnovers, teamSteals, teamBlocks, teamNearPasses, teamTwoMin, teamYellow, teamRed, teamTimeouts, teamShots, teamXg, teamXgot, teamPoss, teamPossPos, teamPossCounter, teamGoalsPos, teamGoalsCounter]) {
       m.set(t.teamId, 0);
     }
   }
@@ -91,6 +97,20 @@ export function recomputeAggregates(
     onCourt.get(p.teamId)?.add(p.playerId);
     if (p.position === 'GK' && !currentGk.get(p.teamId)) currentGk.set(p.teamId, p.playerId);
   }
+
+  // ── Posesiones (por cambio real de balón) y fase ────────────────────────────────
+  // Una posesión de un equipo termina cuando pierde el balón: tira (SHOT), lo pierde
+  // (TURNOVER) o se lo roban (STEAL del rival). Se sigue quién tiene el balón (`holder`)
+  // para no doblar el conteo cuando pérdida y robo del mismo balón se anotan por separado.
+  // La fase solo la llevan las acciones ofensivas terminales (tiro/pérdida); las posesiones
+  // cerradas por robo entran en el total pero no en el desglose por fase.
+  let holder: string | undefined;
+  let pendingStealLoser: string | undefined;   // equipo cuya posesión acaba de cerrar un robo (evita doblar con su pérdida)
+  const endPossession = (teamId: string, phase: AttackPhase | undefined, scored: boolean) => {
+    inc(teamPoss, teamId);
+    if (phase === AttackPhase.POSITIONAL) { inc(teamPossPos, teamId); if (scored) inc(teamGoalsPos, teamId); }
+    else if (phase === AttackPhase.COUNTER) { inc(teamPossCounter, teamId); if (scored) inc(teamGoalsCounter, teamId); }
+  };
 
   for (const ev of events) {
     const acc = ev.playerId ? playerAcc.get(ev.playerId) : undefined;
@@ -165,10 +185,36 @@ export function recomputeAggregates(
           const blockerTeam = teamOfPlayer.get(shot.blockerId);
           if (blockerTeam) inc(teamBlocks, blockerTeam);
         }
+        // Un tiro cierra siempre la posesión del que lanza (incluido el 7 m, que lleva fase).
+        endPossession(ev.teamId, shot.phase, shot.outcome === ShotOutcome.GOAL);
+        holder = opponentTeamId.get(ev.teamId);
+        pendingStealLoser = undefined;
         break;
       }
-      case EventType.TURNOVER: if (acc) acc.turnovers++; inc(teamTurnovers, ev.teamId); break;
-      case EventType.STEAL:    if (acc) acc.steals++;    inc(teamSteals, ev.teamId); break;
+      case EventType.TURNOVER: {
+        if (acc) acc.turnovers++;
+        inc(teamTurnovers, ev.teamId);
+        const to = ev.payload as unknown as TurnoverPayload;
+        // La pérdida cierra posesión, salvo que un robo del rival ya la hubiera cerrado (mismo balón).
+        if (pendingStealLoser === ev.teamId) { pendingStealLoser = undefined; }
+        else { endPossession(ev.teamId, to.phase, false); }
+        holder = opponentTeamId.get(ev.teamId);
+        break;
+      }
+      case EventType.STEAL: {
+        if (acc) acc.steals++;
+        inc(teamSteals, ev.teamId);
+        // El robo cierra la posesión del RIVAL, salvo que el balón ya fuera de este equipo
+        // (p.ej. una pérdida del rival ya contada): así no se dobla el conteo.
+        if (holder !== ev.teamId) {
+          const opp = opponentTeamId.get(ev.teamId);
+          if (opp) { endPossession(opp, undefined, false); pendingStealLoser = opp; }
+        } else {
+          pendingStealLoser = undefined;
+        }
+        holder = ev.teamId;
+        break;
+      }
       case EventType.NEAR_PASS: inc(teamNearPasses, ev.teamId); break;   // evento de equipo, sin jugador
       case EventType.FOUL:     if (acc) acc.fouls++; break;
       case EventType.TWO_MINUTES: if (acc) acc.twoMinutes++; inc(teamTwoMin, ev.teamId); break;
@@ -200,6 +246,15 @@ export function recomputeAggregates(
       steals: teamSteals.get(t.teamId) ?? 0,
       blocks: teamBlocks.get(t.teamId) ?? 0,
       nearPasses: teamNearPasses.get(t.teamId) ?? 0,
+      possessions: teamPoss.get(t.teamId) ?? 0,
+      possessionsByPhase: {
+        positional: teamPossPos.get(t.teamId) ?? 0,
+        counter: teamPossCounter.get(t.teamId) ?? 0,
+      },
+      goalsByPhase: {
+        positional: teamGoalsPos.get(t.teamId) ?? 0,
+        counter: teamGoalsCounter.get(t.teamId) ?? 0,
+      },
       twoMinutes: teamTwoMin.get(t.teamId) ?? 0,
       yellowCards: teamYellow.get(t.teamId) ?? 0,
       redCards: teamRed.get(t.teamId) ?? 0,

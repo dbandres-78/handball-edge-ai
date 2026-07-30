@@ -7,9 +7,9 @@ import type { LiveStats } from './mapping';
  * - Tres bloques: cabecera del partido, resumen por equipo y tabla por jugador
  *   (con Play Score y plus-minus ±, que son propios de Handball Edge AI).
  *
- * Solo incluye lo que la plataforma calcula hoy. Métricas del informe de Handball.AI que aún
- * no se capturan (posesiones, eficiencia por fase, superioridad/inferioridad, sistemas de
- * juego, asistencias, mapas de zona) quedan fuera hasta que se capturen esos eventos.
+ * Solo incluye lo que la plataforma calcula hoy. Ya se capturan posesiones y eficiencia por fase.
+ * Métricas del informe de Handball.AI que aún no se capturan (superioridad/inferioridad, sistemas de
+ * juego, asistencias) quedan fuera hasta que se capturen esos eventos.
  */
 export function buildStatsCsv(stats: LiveStats): string {
   const D = ';';
@@ -19,6 +19,7 @@ export function buildStatsCsv(stats: LiveStats): string {
   };
   const row = (...vals: unknown[]) => vals.map(cell).join(D);
   const pct = (v: number | null) => (v == null ? '' : `${Math.round(v * 100)}%`);
+  const effPct = (g: number, poss: number) => (poss > 0 ? `${Math.round((g / poss) * 100)}%` : '');
   const r1 = (v: number) => (Math.round(v * 10) / 10).toString();
 
   const sm = stats.summary;
@@ -37,10 +38,14 @@ export function buildStatsCsv(stats: LiveStats): string {
   // ── Resumen por equipo ──
   lines.push(row('EQUIPOS'));
   lines.push(row('Equipo', 'Goles', 'Tiros', 'Paradas', '%Parada', 'Pérdidas', 'Recuperaciones',
-    'Blocajes', 'Pases 10m', "Excl. 2'", 'Amarillas', 'Rojas', 'T. muertos', 'xG', 'xGOT'));
+    'Blocajes', 'Pases 10m', "Excl. 2'", 'Amarillas', 'Rojas', 'T. muertos', 'xG', 'xGOT',
+    'Posesiones', 'Ef. ataque', 'Ef. posicional', 'Ef. contra'));
   for (const t of [sm.home, sm.away]) {
     lines.push(row(t.name, t.goals, t.shots, t.saves, pct(t.savePct), t.turnovers, t.steals,
-      t.blocks, t.nearPasses, t.twoMinutes, t.yellowCards, t.redCards, t.timeouts, r1(t.xg), r1(t.xgot)));
+      t.blocks, t.nearPasses, t.twoMinutes, t.yellowCards, t.redCards, t.timeouts, r1(t.xg), r1(t.xgot),
+      t.possessions, effPct(t.goals, t.possessions),
+      effPct(t.goalsByPhase.positional, t.possessionsByPhase.positional),
+      effPct(t.goalsByPhase.counter, t.possessionsByPhase.counter)));
   }
   lines.push('');
 

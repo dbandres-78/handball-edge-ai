@@ -5,7 +5,7 @@ import { ListOrdered, BarChart3, Save, Download, ArrowLeft, Radio } from 'lucide
 import { PALETTE as C, MONO } from '@/lib/theme';
 import { fmt } from '@/lib/handball/format';
 import { ActionDef, ACTIONS } from '@/lib/handball/actions';
-import { EventType, ShotOrigin, ShotOutcome, UiEvent, UiTeam, Side, liveStats } from '@/lib/handball/mapping';
+import { EventType, ShotOrigin, ShotOutcome, UiEvent, UiTeam, Side, liveStats, AttackPhase } from '@/lib/handball/mapping';
 import type { LoadedMatch } from '@/features/matches/types';
 import { TagPanel } from '@/features/analysis/TagPanel';
 import { StatsPanel } from '@/features/analysis/StatsPanel';
@@ -16,9 +16,9 @@ import { useMatchClock } from './useMatchClock';
 import { useMatchPersistence } from './useMatchPersistence';
 import { LiveClock } from './LiveClock';
 import { SyncBadge, RecoveryBanner } from './SyncBadge';
+import { NearPassBar } from '@/features/analysis/NearPassBar';
 
 /** Color distinto al de local/visitante y al ámbar del reloj, para que la tecla destaque. */
-const VIOLET = '#8b5cf6';
 /** Acción de pase a 10 m (evento de equipo). La barra espaciadora es el reloj; Shift suma esto. */
 const NEAR_PASS_ACTION = ACTIONS.find((a) => a.type === EventType.NEAR_PASS)!;
 
@@ -44,6 +44,7 @@ export function LiveRoom({ match }: { match: LoadedMatch }) {
   const [origin, setOrigin] = useState<ShotOrigin | null>(null);
   const [blocker, setBlocker] = useState<number | null>(null);
   const [isPenalty, setIsPenalty] = useState(false);
+  const [phase, setPhase] = useState<AttackPhase>(AttackPhase.POSITIONAL);
 
   const [activeGk, setActiveGk] = useState<Record<Side, number | null>>({ HOME: null, AWAY: null });
   const [tab, setTab] = useState<'tag' | 'stats'>('tag');
@@ -69,6 +70,7 @@ export function LiveRoom({ match }: { match: LoadedMatch }) {
 
   const tag = (a: ActionDef) => {
     const t = clock.now();                       // instante exacto, no el último tick
+    const carriesPhase = a.type === EventType.SHOT || a.type === EventType.TURNOVER;
     const e: UiEvent = {
       id: idRef.current++, t, period, side,
       playerNumber: a.teamOnly ? null : player,
@@ -76,6 +78,7 @@ export function LiveRoom({ match }: { match: LoadedMatch }) {
       origin: a.shot ? origin : null,
       blockerNumber: a.outcome === ShotOutcome.BLOCKED ? blocker : null,
       isPenalty: a.shot && isPenalty ? true : undefined,
+      phase: carriesPhase ? phase : undefined,
     };
     const next = [...events, e].sort((x, y) => x.t - y.t);
     setEvents(next);
@@ -245,36 +248,9 @@ export function LiveRoom({ match }: { match: LoadedMatch }) {
               Suma al equipo que atacas (side). Se acciona con Shift (⇧) o con +1.
               Color morado para destacar sobre local/visitante y el ámbar del reloj. */}
           <div className="px-6 pb-5">
-            <div className="rounded-xl p-3" style={{ background: `${VIOLET}14`, border: `1.5px solid ${VIOLET}` }}>
-              <div className="flex items-center justify-between mb-2">
-                <span style={{ fontFamily: MONO, fontSize: 11, letterSpacing: 1, color: VIOLET, fontWeight: 700 }}>PASES A 10 M · ATAQUE</span>
-                <span style={{ fontSize: 10, color: C.muted }}>⇧ Mayús suma al equipo que atacas</span>
-              </div>
-              <div className="flex items-stretch gap-2">
-                <div className="flex-1 rounded-lg py-1.5 text-center min-w-0"
-                  style={{ background: side === 'HOME' ? `${C.home}22` : C.panel2, border: `1px solid ${side === 'HOME' ? C.home : C.line}` }}>
-                  <div className="truncate px-1" style={{ fontSize: 10, color: C.muted }}>{home.name}</div>
-                  <div style={{ fontFamily: MONO, fontSize: 26, fontWeight: 700, color: side === 'HOME' ? C.home : C.text }}>{stats.summary.home.nearPasses}</div>
-                </div>
-                <button onClick={recordNearPass} className="px-5 rounded-lg flex flex-col items-center justify-center"
-                  style={{ background: VIOLET, color: '#0E1420', fontWeight: 800, minWidth: 92 }}>
-                  <span style={{ fontSize: 22, lineHeight: 1 }}>+1</span>
-                  <span style={{ fontSize: 10, fontWeight: 600 }}>PASE 10M</span>
-                </button>
-                <div className="flex-1 rounded-lg py-1.5 text-center min-w-0"
-                  style={{ background: side === 'AWAY' ? `${C.away}22` : C.panel2, border: `1px solid ${side === 'AWAY' ? C.away : C.line}` }}>
-                  <div className="truncate px-1" style={{ fontSize: 10, color: C.muted }}>{away.name}</div>
-                  <div style={{ fontFamily: MONO, fontSize: 26, fontWeight: 700, color: side === 'AWAY' ? C.away : C.text }}>{stats.summary.away.nearPasses}</div>
-                </div>
-                <button onClick={undoNearPass} title="Quitar el último pase a 10 m del equipo que atacas"
-                  className="px-3 rounded-lg" style={{ background: C.panel3, color: C.muted, border: `1px solid ${C.line}`, fontFamily: MONO, fontSize: 16 }}>
-                  −1
-                </button>
-              </div>
-              <div className="mt-1.5 text-center" style={{ fontSize: 10, color: C.faint }}>
-                Atacas: <b style={{ color: side === 'HOME' ? C.home : C.away }}>{side === 'HOME' ? home.name : away.name}</b> · cámbialo en el panel de anotación
-              </div>
-            </div>
+            <NearPassBar side={side} homeName={home.name} awayName={away.name}
+              homeCount={stats.summary.home.nearPasses} awayCount={stats.summary.away.nearPasses}
+              onAdd={recordNearPass} onUndo={undoNearPass} />
           </div>
           {flash && (
             <div className="absolute left-4 bottom-4 px-3 py-1.5 rounded-md text-sm" style={{ background: C.panel2, border: `1px solid ${C.line}`, fontFamily: MONO }}>
@@ -297,6 +273,7 @@ export function LiveRoom({ match }: { match: LoadedMatch }) {
             {tab === 'tag' ? (
               <TagPanel side={side} setSide={setSide} player={player} setPlayer={setPlayer} period={period} setPeriod={setPeriod}
                 zone={zone} setZone={setZone} origin={origin} setOrigin={setOrigin} blocker={blocker} setBlocker={setBlocker} isPenalty={isPenalty} setIsPenalty={setIsPenalty}
+                phase={phase} setPhase={setPhase}
                 home={home} away={away} setHome={setHome} setAway={setAway}
                 editRoster={editRoster} setEditRoster={setEditRoster} tag={tag} time={clock.seconds}
                 activeGk={activeGk[side]} onGkChange={onGkChange} events={events} recordSub={recordSub}

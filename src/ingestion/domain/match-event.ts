@@ -40,13 +40,29 @@ export enum ShotOutcome {
   BLOCKED = 'BLOCKED', // blocaje defensivo
 }
 
+/**
+ * Fase de ataque en la que se produce la acción terminal (tiro o pérdida). Es la base de la
+ * eficiencia por fase y, en espejo, de la eficacia defensiva del rival (repliegue vs contraataque,
+ * defensa vs ataque posicional). Se marca antes de anotar la acción.
+ */
+export enum AttackPhase {
+  POSITIONAL = 'POSITIONAL',   // ataque posicional (contra defensa colocada)
+  COUNTER = 'COUNTER',         // contraataque / transición
+}
+
 export interface ShotPayload {
   outcome: ShotOutcome;
   origin?: ShotOrigin;           // desde dónde se lanza  -> input de xG
   zone?: number;                 // 1..9 (zona de portería) -> input de xGOT (colocación)
   isPenalty?: boolean;
+  phase?: AttackPhase;           // fase del ataque (posicional / contraataque) -> eficiencia por fase
   goalkeeperId?: string | null;  // portero rival implicado (si SAVED)
   blockerId?: string | null;     // defensor que bloca (si BLOCKED); sin él, el blocaje no se atribuye
+}
+
+/** Pérdida de balón. Cierra la posesión; lleva la fase para la eficiencia por fase. */
+export interface TurnoverPayload {
+  phase?: AttackPhase;
 }
 
 /**

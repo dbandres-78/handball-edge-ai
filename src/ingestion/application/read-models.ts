@@ -80,6 +80,12 @@ export interface TeamSummary {
   steals: number;
   blocks: number;
   nearPasses: number;           // pases a 10 m en ataque (volumen); ataque cercano / defensa permisiva
+  /** Posesiones del equipo: cada tiro, pérdida o robo del rival cierra una (por cambio real de balón). */
+  possessions: number;
+  /** Posesiones cuya acción terminal (tiro/pérdida) llevaba fase marcada. Las cerradas por robo no tienen fase. */
+  possessionsByPhase: { positional: number; counter: number };
+  /** Goles del equipo por fase (base de la eficiencia por fase). */
+  goalsByPhase: { positional: number; counter: number };
   twoMinutes: number;
   yellowCards: number;
   redCards: number;

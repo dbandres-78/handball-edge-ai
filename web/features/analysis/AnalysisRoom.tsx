@@ -3,9 +3,9 @@ import { useState, useRef, useMemo, useEffect, useCallback } from 'react';
 import { ListOrdered, Scissors, BarChart3 } from 'lucide-react';
 import { PALETTE as C } from '@/lib/theme';
 import { fmt } from '@/lib/handball/format';
-import { ActionDef } from '@/lib/handball/actions';
+import { ActionDef, ACTIONS } from '@/lib/handball/actions';
 import {
-  EventType, ShotOrigin, ShotOutcome, UiEvent, UiClip, UiTeam, Side, liveStats,
+  EventType, ShotOrigin, ShotOutcome, UiEvent, UiClip, UiTeam, Side, liveStats, AttackPhase,
 } from '@/lib/handball/mapping';
 import {
   deriveClips, DEFAULT_CLIP_WINDOW, DerivedClip, ClipFilter, ClipWindow, ClipOverride,
@@ -17,9 +17,13 @@ import { TagPanel } from './TagPanel';
 import { ClipsPanel } from './ClipsPanel';
 import { StatsPanel } from './StatsPanel';
 import { EventLog } from './EventLog';
+import { NearPassBar } from './NearPassBar';
 import { extractStats, uploadVideo, startRender, getRenderJob, RenderJobView, saveRoster } from './actions';
 import { toNormalizedMatch } from '@/features/matches/to-normalized';
 import { useMatchPersistence } from '@/features/live/useMatchPersistence';
+
+/** Pase a 10 m (evento de equipo). En vídeo, Shift (⇧) lo suma; el espacio es play/pausa. */
+const NEAR_PASS_ACTION = ACTIONS.find((a) => a.type === EventType.NEAR_PASS)!;
 
 export function AnalysisRoom({ match }: { match: LoadedMatch }) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -45,6 +49,7 @@ export function AnalysisRoom({ match }: { match: LoadedMatch }) {
   const [origin, setOrigin] = useState<ShotOrigin | null>(null);
   const [blocker, setBlocker] = useState<number | null>(null);
   const [isPenalty, setIsPenalty] = useState(false);
+  const [phase, setPhase] = useState<AttackPhase>(AttackPhase.POSITIONAL);
 
   // Clips = proyección de eventos. La selección y los ajustes viven aquí (por id de evento).
   const [clipWindow, setClipWindow] = useState<ClipWindow>(DEFAULT_CLIP_WINDOW);
@@ -133,6 +138,7 @@ export function AnalysisRoom({ match }: { match: LoadedMatch }) {
   };
 
   const tag = (a: ActionDef) => {
+    const carriesPhase = a.type === EventType.SHOT || a.type === EventType.TURNOVER;
     const e: UiEvent = {
       id: idRef.current++, t: time, period, side,
       playerNumber: a.teamOnly ? null : player,
@@ -140,6 +146,7 @@ export function AnalysisRoom({ match }: { match: LoadedMatch }) {
       origin: a.shot ? origin : null,
       blockerNumber: a.outcome === ShotOutcome.BLOCKED ? blocker : null,
       isPenalty: a.shot && isPenalty ? true : undefined,
+      phase: carriesPhase ? phase : undefined,
     };
     const next = [...events, e].sort((x, y) => x.t - y.t);
     setEvents(next);
@@ -154,6 +161,18 @@ export function AnalysisRoom({ match }: { match: LoadedMatch }) {
     // Limpieza del clip asociado (mismo id): selección y ajuste manual.
     setSelectedClips((prev) => { if (!prev.has(id)) return prev; const n = new Set(prev); n.delete(id); return n; });
     setClipOverrides((prev) => { if (!(id in prev)) return prev; const n = { ...prev }; delete n[id]; return n; });
+  };
+
+  // Pase a 10 m: evento de EQUIPO que se suma al que ataca (`side`). Reutiliza tag() (persistencia,
+  // orden, flash, paridad). Shift lo dispara; el −1 corrige la última pulsación de ese equipo.
+  const recordNearPass = () => tag(NEAR_PASS_ACTION);
+  const undoNearPass = () => {
+    const last = [...events].reverse().find((e) => e.type === EventType.NEAR_PASS && e.side === side);
+    if (!last) return;
+    const next = events.filter((e) => e.id !== last.id);
+    setEvents(next);
+    void persistence.record(next);
+    doFlash(`Pase a 10m −1 · ${side === 'HOME' ? home.name : away.name}`);
   };
 
   // ── Clips derivados: selección, filtros y ajuste fino ────────────────────────
@@ -235,16 +254,31 @@ export function AnalysisRoom({ match }: { match: LoadedMatch }) {
 
   useEffect(() => () => { if (pollRef.current) clearTimeout(pollRef.current); }, []);
 
+  const recordNearPassRef = useRef<() => void>(() => {});
+  useEffect(() => { recordNearPassRef.current = recordNearPass; });
+  const shiftUsedRef = useRef(false);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const tg = e.target as HTMLElement;
       if (tg && (tg.tagName === 'INPUT' || tg.tagName === 'TEXTAREA')) return;
-      if (e.code === 'Space') { e.preventDefault(); togglePlay(); }
-      else if (e.code === 'ArrowLeft') seek(time - (e.shiftKey ? 0.1 : 3));
-      else if (e.code === 'ArrowRight') seek(time + (e.shiftKey ? 0.1 : 3));
+      if (e.code === 'Space') { e.preventDefault(); togglePlay(); return; }
+      if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') { if (!e.repeat) shiftUsedRef.current = false; return; }
+      if (e.code === 'ArrowLeft') { if (e.shiftKey) shiftUsedRef.current = true; seek(time - (e.shiftKey ? 0.1 : 3)); return; }
+      if (e.code === 'ArrowRight') { if (e.shiftKey) shiftUsedRef.current = true; seek(time + (e.shiftKey ? 0.1 : 3)); return; }
+      if (e.shiftKey) shiftUsedRef.current = true;   // Shift + otra tecla = modificador, no pase
+    };
+    // Shift como TOQUE limpio (sin flecha) = +1 pase a 10 m; así no choca con Shift+flecha (frame).
+    const onKeyUp = (e: KeyboardEvent) => {
+      const tg = e.target as HTMLElement;
+      if (tg && (tg.tagName === 'INPUT' || tg.tagName === 'TEXTAREA')) return;
+      if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') {
+        if (!shiftUsedRef.current) recordNearPassRef.current();
+        shiftUsedRef.current = false;
+      }
     };
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    window.addEventListener('keyup', onKeyUp);
+    return () => { window.removeEventListener('keydown', onKey); window.removeEventListener('keyup', onKeyUp); };
   }, [time, togglePlay, seek]);
 
   return (
@@ -259,15 +293,22 @@ export function AnalysisRoom({ match }: { match: LoadedMatch }) {
       />
 
       <div className="flex flex-col lg:flex-row flex-1 min-h-0">
-        <VideoStage
-          videoRef={videoRef} videoUrl={videoUrl} onLoadVideo={loadVideo}
-          onLoadedMetadata={setDuration} onTimeUpdate={onTimeUpdate}
-          onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)}
-          togglePlay={togglePlay} seek={seek} time={time} duration={duration} playing={playing}
-          speed={speed} setSpeed={setSpeed} events={events} clips={selectedForTimeline} flash={flash}
-        />
+        <div className="flex-1 min-h-0 flex flex-col">
+          <VideoStage
+            videoRef={videoRef} videoUrl={videoUrl} onLoadVideo={loadVideo}
+            onLoadedMetadata={setDuration} onTimeUpdate={onTimeUpdate}
+            onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)}
+            togglePlay={togglePlay} seek={seek} time={time} duration={duration} playing={playing}
+            speed={speed} setSpeed={setSpeed} events={events} clips={selectedForTimeline} flash={flash}
+          />
+          <div className="px-3 pb-3">
+            <NearPassBar side={side} homeName={home.name} awayName={away.name}
+              homeCount={stats.summary.home.nearPasses} awayCount={stats.summary.away.nearPasses}
+              onAdd={recordNearPass} onUndo={undoNearPass} />
+          </div>
+        </div>
 
-        <div className="lg:w-96 flex flex-col min-h-0" style={{ borderLeft: `1px solid ${C.line}`, background: C.panel }}>
+        <div className="lg:w-[30rem] flex flex-col min-h-0" style={{ borderLeft: `1px solid ${C.line}`, background: C.panel }}>
           <div className="flex" style={{ borderBottom: `1px solid ${C.line}` }}>
             {([['tag', 'Etiquetar', ListOrdered], ['clips', 'Clips', Scissors], ['stats', 'Estadística', BarChart3]] as const).map(([k, l, Ic]) => (
               <button key={k} onClick={() => setTab(k)} className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-sm"
@@ -281,6 +322,7 @@ export function AnalysisRoom({ match }: { match: LoadedMatch }) {
             {tab === 'tag' && (
               <TagPanel side={side} setSide={setSide} player={player} setPlayer={setPlayer} period={period} setPeriod={setPeriod}
                 zone={zone} setZone={setZone} origin={origin} setOrigin={setOrigin} blocker={blocker} setBlocker={setBlocker} isPenalty={isPenalty} setIsPenalty={setIsPenalty}
+                phase={phase} setPhase={setPhase}
                 home={home} away={away} setHome={setHome} setAway={setAway}
                 editRoster={editRoster} setEditRoster={setEditRoster} tag={tag} time={time}
                 activeGk={activeGk[side]} onGkChange={onGkChange} events={events} recordSub={recordSub}

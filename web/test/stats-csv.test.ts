@@ -47,6 +47,9 @@ check('cabecera con equipos, resultado, competición y jornada', () => {
 check('bloque EQUIPOS con los pases a 10 m', () => {
   const header = lines.find((l) => l.startsWith('Equipo;Goles'))!;
   assert.ok(header.includes('Pases 10m'));
+  assert.ok(header.includes('Posesiones'));
+  assert.ok(header.includes('Ef. posicional'));
+  assert.ok(header.includes('Ef. contra'));
   const homeRow = lines.find((l) => l.startsWith('BM Óviedo;'))!;
   assert.ok(homeRow.split(';').includes('1'));   // 1 pase a 10m (columna Pases 10m)
 });

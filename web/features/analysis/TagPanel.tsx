@@ -4,7 +4,7 @@ import { Shield, Pencil, X, Plus, ArrowLeftRight, BookMarked, Check, Loader2 } f
 import { PALETTE as C, MONO } from '@/lib/theme';
 import { fmt } from '@/lib/handball/format';
 import { ACTIONS, ActionDef, Tone } from '@/lib/handball/actions';
-import { UiTeam, Side, ShotOrigin, UiEvent, onCourtAt } from '@/lib/handball/mapping';
+import { UiTeam, Side, ShotOrigin, UiEvent, onCourtAt, AttackPhase } from '@/lib/handball/mapping';
 import { GoalTarget } from './GoalTarget';
 import { ShotOriginCourt, ORIGIN_LABEL } from './ShotOriginCourt';
 import { saveToCatalog } from './actions';
@@ -19,6 +19,8 @@ interface Props {
   origin: ShotOrigin | null; setOrigin: (o: ShotOrigin | null) => void;
   blocker: number | null; setBlocker: (n: number | null) => void;
   isPenalty: boolean; setIsPenalty: (v: boolean) => void;
+  /** Fase de ataque activa (se aplica a la próxima acción de tiro/pérdida). */
+  phase: AttackPhase; setPhase: (p: AttackPhase) => void;
   home: UiTeam; away: UiTeam;
   setHome: (t: UiTeam) => void; setAway: (t: UiTeam) => void;
   editRoster: boolean; setEditRoster: (v: boolean) => void;
@@ -232,13 +234,13 @@ export function TagPanel(p: Props) {
           </span>
         </div>
         <div className="flex justify-center">
-          <ShotOriginCourt mode="input" value={p.origin} onPick={p.setOrigin} accent={accent} width={210} />
+          <ShotOriginCourt mode="input" value={p.origin} onPick={p.setOrigin} accent={accent} width={300} />
         </div>
       </div>
 
       {/* A dónde va el balón (xGOT) */}
       <div className="flex items-center gap-3 p-2.5 rounded-md" style={{ background: C.panel2, border: `1px solid ${C.line}` }}>
-        <GoalTarget mode="input" value={p.zone} onPick={p.setZone} accent={accent} size={100} />
+        <GoalTarget mode="input" value={p.zone} onPick={p.setZone} accent={accent} size={150} />
         <div className="text-xs" style={{ color: C.muted }}>
           <div style={{ color: C.text, fontWeight: 600, marginBottom: 2 }}>A dónde va</div>
           {p.zone
@@ -286,6 +288,26 @@ export function TagPanel(p: Props) {
         </div>
         <div style={{ fontSize: 10, color: C.faint, marginTop: 4 }}>
           Opcional — solo aplica a «Blocado». Sin defensor, el blocaje no se atribuye.
+        </div>
+      </div>
+
+      {/* FASE del ataque: se elige ANTES de anotar. Se aplica a tiro y pérdida (base de la
+          eficiencia por fase y, en espejo, de la eficacia defensiva del rival). */}
+      <div className="p-2.5 rounded-md" style={{ background: C.panel2, border: `1px solid ${C.line}` }}>
+        <div className="flex items-center justify-between mb-1.5">
+          <span style={{ fontSize: 11, color: C.text, fontWeight: 600 }}>Fase del ataque</span>
+          <span style={{ fontSize: 10, color: C.faint }}>se aplica a gol / tiro / pérdida</span>
+        </div>
+        <div className="grid grid-cols-2 gap-1.5">
+          {([[AttackPhase.POSITIONAL, 'Posicional'], [AttackPhase.COUNTER, 'Contraataque']] as const).map(([ph, label]) => {
+            const on = p.phase === ph;
+            return (
+              <button key={ph} onClick={() => p.setPhase(ph)} className="py-2 rounded-md text-sm"
+                style={{ background: on ? accent : C.panel, color: on ? '#0E1420' : C.muted, border: `1px solid ${on ? accent : C.line}`, fontWeight: on ? 700 : 500 }}>
+                {label}
+              </button>
+            );
+          })}
         </div>
       </div>
 

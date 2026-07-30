@@ -4,7 +4,7 @@ import { Shield, ChevronRight, Download } from 'lucide-react';
 import { PALETTE as C, MONO } from '@/lib/theme';
 import { TERM_ES } from '@/lib/handball/actions';
 import { buildStatsCsv, statsCsvFilename } from '@/lib/handball/stats-csv';
-import { LiveStats, Side, UiEvent, EventType, ShotOutcome } from '@/lib/handball/mapping';
+import { LiveStats, Side, UiEvent, EventType, ShotOutcome, TeamSummary } from '@/lib/handball/mapping';
 import { GoalTarget } from './GoalTarget';
 import { ShotOriginCourt } from './ShotOriginCourt';
 
@@ -95,6 +95,9 @@ export function StatsPanel(p: Props) {
         <Metric label="EXCL. 2′" value={s.twoMinutes} />
         <Metric label="T.M." value={s.timeouts} />
       </div>
+
+      {/* Posesiones y fases: eficiencia de ataque por fase y, en espejo, eficacia defensiva. */}
+      <PhasePanel s={s} opp={p.statTeam === 'HOME' ? p.stats.summary.away : p.stats.summary.home} accent={accent} />
 
       {/* Desde dónde se tira: base del xG */}
       <div className="p-3 rounded-md" style={{ background: C.panel2, border: `1px solid ${C.line}` }}>
@@ -210,6 +213,60 @@ export function StatsPanel(p: Props) {
         Diferencial ± = goles del equipo con el jugador en pista. Se muestra siempre; por defecto no suma al
         Play Score (solapa con los goles ya puntuados y su precisión depende de registrar los cambios en
         pista). Sin cambios etiquetados, refleja el diferencial del equipo para los titulares.
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Posesiones y eficiencia por fase (goles/posesiones) del equipo, y su ESPEJO defensivo:
+ * defensa colocada = 1 − eficiencia posicional del rival; repliegue = 1 − su eficiencia en contra.
+ * Las posesiones cerradas por robo del rival no llevan fase, así que la suma por fase puede ser
+ * menor que el total; es lo honesto.
+ */
+function PhasePanel({ s, opp, accent }: { s: TeamSummary; opp: TeamSummary; accent: string }) {
+  const pct = (num: number, den: number): number | null => (den > 0 ? Math.round((num / den) * 1000) / 10 : null);
+  const fmtPct = (v: number | null) => (v == null ? '—' : `${v}%`);
+
+  const globalEff = pct(s.goals, s.possessions);
+  const posEff = pct(s.goalsByPhase.positional, s.possessionsByPhase.positional);
+  const cntEff = pct(s.goalsByPhase.counter, s.possessionsByPhase.counter);
+  // Espejo: eficacia defensiva de ESTE equipo = 100 − eficiencia atacante del rival en esa fase.
+  const oppPos = pct(opp.goalsByPhase.positional, opp.possessionsByPhase.positional);
+  const oppCnt = pct(opp.goalsByPhase.counter, opp.possessionsByPhase.counter);
+  const defPositional = oppPos == null ? null : Math.round((100 - oppPos) * 10) / 10;
+  const defRepliegue = oppCnt == null ? null : Math.round((100 - oppCnt) * 10) / 10;
+
+  const Row = ({ label, value, sub, strong }: { label: string; value: string; sub?: string; strong?: boolean }) => (
+    <div className="flex items-center justify-between py-1">
+      <span style={{ fontSize: 12, color: strong ? C.text : C.muted, fontWeight: strong ? 600 : 400 }}>{label}</span>
+      <span style={{ fontFamily: MONO, fontSize: strong ? 15 : 13, fontWeight: 700, color: strong ? accent : C.text }}>
+        {value}{sub && <span style={{ fontSize: 10, color: C.faint, fontWeight: 400 }}> {sub}</span>}
+      </span>
+    </div>
+  );
+
+  return (
+    <div className="p-3 rounded-md" style={{ background: C.panel2, border: `1px solid ${C.line}` }}>
+      <div className="flex items-center justify-between mb-1">
+        <span style={{ fontSize: 11, letterSpacing: 1, color: C.faint }}>POSESIONES Y FASES</span>
+        <span style={{ fontFamily: MONO, fontSize: 13, color: C.text, fontWeight: 700 }}>{s.possessions} pos.</span>
+      </div>
+
+      <Row label="Eficiencia de ataque" value={fmtPct(globalEff)} sub={`${s.goals}/${s.possessions}`} strong />
+      <div style={{ height: 1, background: C.line, margin: '4px 0' }} />
+      <Row label="Ataque posicional" value={fmtPct(posEff)} sub={`${s.goalsByPhase.positional}/${s.possessionsByPhase.positional}`} />
+      <Row label="Contraataque" value={fmtPct(cntEff)} sub={`${s.goalsByPhase.counter}/${s.possessionsByPhase.counter}`} />
+
+      <div className="mt-2 pt-2" style={{ borderTop: `1px solid ${C.line}` }}>
+        <div style={{ fontSize: 10, letterSpacing: 1, color: C.faint, marginBottom: 2 }}>EN DEFENSA · vs {opp.name}</div>
+        <Row label="Defensa (su ataque posicional)" value={fmtPct(defPositional)} />
+        <Row label="Repliegue (su contraataque)" value={fmtPct(defRepliegue)} />
+      </div>
+
+      <div style={{ fontSize: 10, color: C.faint, marginTop: 6 }}>
+        Eficiencia = goles / posesiones. La eficacia defensiva es el espejo del ataque rival en esa fase.
+        Las posesiones perdidas por robo no llevan fase, por eso la suma por fase puede ser menor que el total.
       </div>
     </div>
   );
