@@ -66,6 +66,18 @@ async function main() {
     assert.equal(p7.name, 'Central (renombrado)');   // el nombre sí se actualiza
   });
 
+  await check('create() en DIRECTO con catálogo persiste temporada y enlaces igual que vídeo', async () => {
+    // Bloque 1: el alta en directo «desde catálogo» manda el mismo payload que vídeo.
+    const m = await repo.create({ mode: 'live', season: '26/27', home, away });
+    const loaded = (await repo.get(m.matchId))!;
+    assert.equal(loaded.mode, 'live');
+    assert.equal(loaded.season, '26/27');
+    assert.equal(loaded.home.clubId, 'CLUB-OVI');
+    assert.equal(loaded.away.clubId, 'CLUB-LIT');
+    const p7 = loaded.home.players.find((p) => p.number === 7)!;
+    assert.equal(p7.playerId, 'RP-OVI-7');
+  });
+
   await check('un partido sin enlaces (flujo antiguo) sigue funcionando', async () => {
     const plain: UiTeam = { name: 'A', players: [{ number: 1, name: 'GK', gk: true }] };
     const m = await repo.create({ mode: 'live', home: plain, away: { name: 'B', players: [{ number: 1, name: 'GK', gk: true }] } });

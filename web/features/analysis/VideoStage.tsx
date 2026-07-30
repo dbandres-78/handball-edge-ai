@@ -1,7 +1,7 @@
 'use client';
 import { useRef, RefObject } from 'react';
 import {
-  Play, Pause, SkipBack, SkipForward, Rewind, FastForward, Scissors, Upload,
+  Play, Pause, SkipBack, SkipForward, Rewind, FastForward, Upload,
 } from 'lucide-react';
 import { PALETTE as C, MONO } from '@/lib/theme';
 import { fmt } from '@/lib/handball/format';
@@ -17,9 +17,9 @@ interface Props {
   togglePlay: () => void; seek: (t: number) => void;
   time: number; duration: number; playing: boolean;
   speed: number; setSpeed: (s: number) => void;
-  events: UiEvent[]; clips: UiClip[];
-  inPt: number | null; outPt: number | null;
-  markIn: () => void; markOut: () => void; addClip: () => void;
+  events: UiEvent[];
+  /** Clips seleccionados, pintados como bandas bajo la barra de tiempo. */
+  clips: UiClip[];
   flash: string | null;
 }
 
@@ -48,13 +48,13 @@ export function VideoStage(p: Props) {
         )}
       </div>
 
-      <Timeline time={p.time} duration={p.duration} events={p.events} clips={p.clips} inPt={p.inPt} outPt={p.outPt} seek={p.seek} />
+      <Timeline time={p.time} duration={p.duration} events={p.events} clips={p.clips} seek={p.seek} />
       <Transport {...p} />
     </div>
   );
 }
 
-function Timeline({ time, duration, events, clips, inPt, outPt, seek }: Pick<Props, 'time' | 'duration' | 'events' | 'clips' | 'inPt' | 'outPt' | 'seek'>) {
+function Timeline({ time, duration, events, clips, seek }: Pick<Props, 'time' | 'duration' | 'events' | 'clips' | 'seek'>) {
   const barRef = useRef<HTMLDivElement>(null);
   const pct = (t: number) => (duration ? (t / duration) * 100 : 0);
   const onClick = (e: React.MouseEvent) => {
@@ -64,11 +64,8 @@ function Timeline({ time, duration, events, clips, inPt, outPt, seek }: Pick<Pro
   return (
     <div className="select-none">
       <div ref={barRef} onClick={onClick} className="relative h-10 rounded-md cursor-pointer" style={{ background: C.panel, border: `1px solid ${C.line}` }}>
-        {inPt != null && outPt != null && outPt > inPt && (
-          <div className="absolute top-0 bottom-0" style={{ left: `${pct(inPt)}%`, width: `${pct(outPt - inPt)}%`, background: `${C.amber}22`, borderLeft: `2px solid ${C.amber}`, borderRight: `2px solid ${C.amber}` }} />
-        )}
         {clips.map((c) => (
-          <div key={c.id} className="absolute bottom-0 h-1.5" title={c.label} style={{ left: `${pct(c.in)}%`, width: `${pct(c.out - c.in)}%`, background: C.amber, opacity: 0.6, borderRadius: 2 }} />
+          <div key={c.id} className="absolute bottom-0 h-1.5" title={c.label} style={{ left: `${pct(c.in)}%`, width: `${pct(c.out - c.in)}%`, background: C.amber, opacity: 0.7, borderRadius: 2 }} />
         ))}
         {events.map((ev) => {
           const isGoal = ev.type === EventType.SHOT && ev.outcome === ShotOutcome.GOAL;
@@ -109,16 +106,8 @@ function Transport(p: Props) {
         ))}
       </div>
 
-      <div className="flex items-center gap-1.5 ml-auto">
-        <Btn onClick={p.markIn} title="Marcar entrada (i)" active={p.inPt != null}>
-          <span style={{ fontFamily: MONO, fontSize: 12 }}>IN {p.inPt != null ? fmt(p.inPt) : '—'}</span>
-        </Btn>
-        <Btn onClick={p.markOut} title="Marcar salida (o)" active={p.outPt != null}>
-          <span style={{ fontFamily: MONO, fontSize: 12 }}>OUT {p.outPt != null ? fmt(p.outPt) : '—'}</span>
-        </Btn>
-        <button onClick={p.addClip} className="flex items-center gap-1 h-8 px-2.5 rounded-md text-sm" style={{ background: C.panel, border: `1px solid ${C.line}`, color: C.amber, fontWeight: 600 }}>
-          <Scissors size={14} /> Cortar
-        </button>
+      <div className="ml-auto" style={{ fontFamily: MONO, fontSize: 12, color: C.muted }}>
+        {fmt(p.time)} / {fmt(p.duration)}
       </div>
     </div>
   );

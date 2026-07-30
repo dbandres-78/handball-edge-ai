@@ -1,0 +1,98 @@
+import { EventType, ShotOutcome, UiEvent, UiTeam, Side } from './mapping';
+import { actionByType } from './actions';
+import { fmt } from './format';
+
+/**
+ * Clips como PROYECCIÓN de los eventos (event-sourcing). Ya no se marca in/out a mano: cada
+ * acción de juego anotada genera un clip candidato con una ventana [t − preRoll, t + postRoll].
+ * El usuario selecciona cuáles renderizar. Función pura → testeable y con paridad garantizada.
+ */
+
+export interface ClipWindow { preRoll: number; postRoll: number }
+export const DEFAULT_CLIP_WINDOW: ClipWindow = { preRoll: 8, postRoll: 4 };
+
+/**
+ * Tipos de evento que generan clip. Acciones de juego; se excluyen a propósito las
+ * administrativas (cambio, cambio de portero, tiempo muerto) y el pase a 10 m (son muchos).
+ */
+export const CLIP_EVENT_TYPES: ReadonlySet<EventType> = new Set<EventType>([
+  EventType.SHOT,        // gol, parada, fuera, blocado (incluye penalti)
+  EventType.TURNOVER,    // pérdida
+  EventType.STEAL,       // recuperación
+  EventType.FOUL,        // falta
+  EventType.TWO_MINUTES, // exclusión 2′
+  EventType.YELLOW_CARD, // amarilla
+  EventType.RED_CARD,    // roja
+]);
+
+export function isClipWorthy(e: UiEvent): boolean {
+  return CLIP_EVENT_TYPES.has(e.type);
+}
+
+export interface DerivedClip {
+  /** id del evento origen: clave estable del clip (borrar el evento borra el clip). */
+  eventId: number;
+  in: number; out: number;
+  label: string;
+  side: Side;
+  type: EventType;
+  outcome: ShotOutcome | null;
+  isGoal: boolean;
+  isTurnover: boolean;
+  /** true si tiene ajuste manual de in/out sobre la ventana por defecto. */
+  edited: boolean;
+}
+
+/** Ajuste manual por clip (sobre la ventana global). */
+export interface ClipOverride { in?: number; out?: number }
+
+/** Filtros rápidos del panel. Local/Visitante = dimensión equipo; Goles/Pérdidas = dimensión tipo. */
+export type ClipFilter = 'HOME' | 'AWAY' | 'GOALS' | 'TURNOVERS';
+
+const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+
+export function deriveClips(
+  events: UiEvent[], home: UiTeam, away: UiTeam,
+  duration: number, window: ClipWindow,
+  overrides: Record<number, ClipOverride> = {},
+): DerivedClip[] {
+  const hi = duration > 0 ? duration : Number.POSITIVE_INFINITY;
+  return events
+    .filter(isClipWorthy)
+    .slice()
+    .sort((a, b) => a.t - b.t || a.id - b.id)
+    .map((e) => {
+      const ov = overrides[e.id] ?? {};
+      const inPt = clamp(ov.in ?? e.t - window.preRoll, 0, hi);
+      const outPt = clamp(ov.out ?? e.t + window.postRoll, 0, hi);
+      const action = actionByType(e.type, e.outcome);
+      const who = e.playerNumber != null ? `#${e.playerNumber}` : e.side === 'HOME' ? home.name : away.name;
+      const label = `${action?.label ?? e.type} · ${who} · ${fmt(e.t)}`;
+      return {
+        eventId: e.id, in: inPt, out: outPt, label,
+        side: e.side, type: e.type, outcome: e.outcome,
+        isGoal: e.type === EventType.SHOT && e.outcome === ShotOutcome.GOAL,
+        isTurnover: e.type === EventType.TURNOVER,
+        edited: ov.in != null || ov.out != null,
+      };
+    });
+}
+
+/**
+ * ¿Pasa el clip los filtros activos? Dentro de cada dimensión los filtros suman (OR); entre
+ * dimensiones se cruzan (AND). Sin filtros de una dimensión, esa dimensión no restringe.
+ */
+export function matchesFilters(c: DerivedClip, filters: Set<ClipFilter>): boolean {
+  if (filters.size === 0) return true;
+  const teamActive = filters.has('HOME') || filters.has('AWAY');
+  const typeActive = filters.has('GOALS') || filters.has('TURNOVERS');
+
+  const teamOk = !teamActive
+    || (filters.has('HOME') && c.side === 'HOME')
+    || (filters.has('AWAY') && c.side === 'AWAY');
+  const typeOk = !typeActive
+    || (filters.has('GOALS') && c.isGoal)
+    || (filters.has('TURNOVERS') && c.isTurnover);
+
+  return teamOk && typeOk;
+}
