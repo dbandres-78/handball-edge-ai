@@ -3,6 +3,8 @@ import { Play, Film, Download, Loader2, CheckSquare, Square, RotateCcw, Minus, P
 import { PALETTE as C, MONO } from '@/lib/theme';
 import { fmt } from '@/lib/handball/format';
 import { DerivedClip, ClipFilter, ClipWindow, matchesFilters } from '@/lib/handball/clips';
+import { ShotOrigin } from '@/lib/handball/mapping';
+import { ORIGIN_SHORT } from './ShotOriginCourt';
 import type { RenderJobView } from './actions';
 
 interface Props {
@@ -23,12 +25,29 @@ interface Props {
   videoUploading: boolean; videoReady: boolean;
 }
 
-const FILTERS: { key: ClipFilter; label: string; color: string }[] = [
+const TEAM_FILTERS: { key: ClipFilter; label: string; color: string }[] = [
   { key: 'HOME', label: 'Local', color: C.home },
   { key: 'AWAY', label: 'Visitante', color: C.away },
-  { key: 'GOALS', label: 'Goles', color: C.goal },
-  { key: 'TURNOVERS', label: 'Pérdidas', color: C.neg },
 ];
+const ACTION_FILTERS: { key: ClipFilter; label: string; color: string }[] = [
+  { key: 'GOAL', label: 'Gol', color: C.goal },
+  { key: 'SAVED', label: 'Parada', color: C.save },
+  { key: 'MISSED', label: 'Fuera', color: C.miss },
+  { key: 'BLOCKED', label: 'Blocado', color: C.miss },
+  { key: 'TURNOVER', label: 'Pérdida', color: C.neg },
+  { key: 'STEAL', label: 'Recuperación', color: C.pos },
+  { key: 'FOUL', label: 'Falta', color: C.neutral },
+  { key: 'TWO_MINUTES', label: 'Excl. 2′', color: C.warn },
+  { key: 'YELLOW', label: 'Amarilla', color: C.warn },
+  { key: 'RED', label: 'Roja', color: C.neg },
+];
+// Zonas de tiro en orden de pantalla (izquierda→derecha), con su etiqueta corta.
+const ZONE_ORDER: ShotOrigin[] = [
+  ShotOrigin.WING_RIGHT, ShotOrigin.NINE_RIGHT, ShotOrigin.SIX_RIGHT,
+  ShotOrigin.NINE_CENTER, ShotOrigin.SIX_CENTER,
+  ShotOrigin.SIX_LEFT, ShotOrigin.NINE_LEFT, ShotOrigin.WING_LEFT,
+];
+const ZONE_FILTERS: { key: ClipFilter; label: string }[] = ZONE_ORDER.map((o) => ({ key: `Z:${o}` as ClipFilter, label: ORIGIN_SHORT[o] }));
 
 export function ClipsPanel(p: Props) {
   const running = p.renderJob?.status === 'running' || p.renderJob?.status === 'queued';
@@ -59,17 +78,11 @@ export function ClipsPanel(p: Props) {
         </div>
       </div>
 
-      {/* Filtros rápidos */}
-      <div className="flex flex-wrap gap-1.5">
-        {FILTERS.map((f) => {
-          const on = p.filters.has(f.key);
-          return (
-            <button key={f.key} onClick={() => p.toggleFilter(f.key)} className="px-2.5 py-1 rounded-full text-xs"
-              style={{ background: on ? `${f.color}22` : C.panel2, border: `1px solid ${on ? f.color : C.line}`, color: on ? f.color : C.muted, fontWeight: on ? 600 : 500 }}>
-              {f.label}
-            </button>
-          );
-        })}
+      {/* Filtros: equipo · acción · zona (OR dentro de cada grupo, AND entre grupos) */}
+      <div className="flex flex-col gap-2">
+        <FilterGroup label="Equipo" filters={TEAM_FILTERS} active={p.filters} onToggle={p.toggleFilter} />
+        <FilterGroup label="Acción" filters={ACTION_FILTERS} active={p.filters} onToggle={p.toggleFilter} />
+        <FilterGroup label="Zona de tiro" filters={ZONE_FILTERS} active={p.filters} onToggle={p.toggleFilter} mono />
       </div>
 
       {/* Acciones de selección */}
@@ -179,6 +192,30 @@ function Edge({ label, onMinus, onPlus }: { label: string; onMinus: () => void; 
       <span style={{ fontFamily: MONO, fontSize: 10, color: C.faint, width: 26 }}>{label}</span>
       <button onClick={onMinus} className="w-6 h-6 rounded flex items-center justify-center" style={{ background: C.panel, border: `1px solid ${C.line}`, color: C.muted }}><Minus size={12} /></button>
       <button onClick={onPlus} className="w-6 h-6 rounded flex items-center justify-center" style={{ background: C.panel, border: `1px solid ${C.line}`, color: C.muted }}><Plus size={12} /></button>
+    </div>
+  );
+}
+
+function FilterGroup({ label, filters, active, onToggle, mono }: {
+  label: string;
+  filters: { key: ClipFilter; label: string; color?: string }[];
+  active: Set<ClipFilter>; onToggle: (f: ClipFilter) => void; mono?: boolean;
+}) {
+  return (
+    <div>
+      <div style={{ fontSize: 9, letterSpacing: 1, color: C.faint, marginBottom: 3 }}>{label.toUpperCase()}</div>
+      <div className="flex flex-wrap gap-1">
+        {filters.map((f) => {
+          const on = active.has(f.key);
+          const col = f.color ?? C.amber;
+          return (
+            <button key={f.key} onClick={() => onToggle(f.key)} className="px-2 py-0.5 rounded-full text-xs"
+              style={{ background: on ? `${col}22` : C.panel2, border: `1px solid ${on ? col : C.line}`, color: on ? col : C.muted, fontWeight: on ? 600 : 500, fontFamily: mono ? MONO : undefined, minWidth: mono ? 34 : undefined, textAlign: 'center' }}>
+              {f.label}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }

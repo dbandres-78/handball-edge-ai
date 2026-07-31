@@ -1,4 +1,4 @@
-import { EventType, ShotOutcome, UiEvent, UiTeam, Side } from './mapping';
+import { EventType, ShotOutcome, ShotOrigin, UiEvent, UiTeam, Side } from './mapping';
 import { actionByType } from './actions';
 import { fmt } from './format';
 
@@ -37,6 +37,7 @@ export interface DerivedClip {
   side: Side;
   type: EventType;
   outcome: ShotOutcome | null;
+  origin: ShotOrigin | null;   // zona de lanzamiento (solo tiros); base del filtro por zona
   isGoal: boolean;
   isTurnover: boolean;
   /** true si tiene ajuste manual de in/out sobre la ventana por defecto. */
@@ -46,8 +47,58 @@ export interface DerivedClip {
 /** Ajuste manual por clip (sobre la ventana global). */
 export interface ClipOverride { in?: number; out?: number }
 
-/** Filtros rápidos del panel. Local/Visitante = dimensión equipo; Goles/Pérdidas = dimensión tipo. */
-export type ClipFilter = 'HOME' | 'AWAY' | 'GOALS' | 'TURNOVERS';
+/**
+ * Filtros del panel de clips en tres dimensiones:
+ *  · Equipo: HOME / AWAY.
+ *  · Acción: por resultado de tiro (GOAL/SAVED/MISSED/BLOCKED) o por tipo de acción.
+ *  · Zona de tiro: cada origen de lanzamiento (solo aplica a tiros).
+ * Dentro de una dimensión los filtros suman (OR); entre dimensiones se cruzan (AND).
+ */
+export type ClipTeamFilter = 'HOME' | 'AWAY';
+export type ClipActionFilter =
+  | 'GOAL' | 'SAVED' | 'MISSED' | 'BLOCKED'
+  | 'TURNOVER' | 'STEAL' | 'FOUL' | 'TWO_MINUTES' | 'YELLOW' | 'RED';
+export type ClipZoneFilter = `Z:${ShotOrigin}`;
+export type ClipFilter = ClipTeamFilter | ClipActionFilter | ClipZoneFilter;
+
+const TYPE_TO_ACTION: Partial<Record<EventType, ClipActionFilter>> = {
+  [EventType.TURNOVER]: 'TURNOVER',
+  [EventType.STEAL]: 'STEAL',
+  [EventType.FOUL]: 'FOUL',
+  [EventType.TWO_MINUTES]: 'TWO_MINUTES',
+  [EventType.YELLOW_CARD]: 'YELLOW',
+  [EventType.RED_CARD]: 'RED',
+};
+
+/** Clave de acción de un clip: para tiros es su resultado; para el resto, su tipo. */
+export function clipActionKey(c: DerivedClip): ClipActionFilter | null {
+  if (c.type === EventType.SHOT) return (c.outcome as ClipActionFilter) ?? null; // GOAL/SAVED/MISSED/BLOCKED
+  return TYPE_TO_ACTION[c.type] ?? null;
+}
+
+const ACTION_KEYS = new Set<string>(['GOAL', 'SAVED', 'MISSED', 'BLOCKED', 'TURNOVER', 'STEAL', 'FOUL', 'TWO_MINUTES', 'YELLOW', 'RED']);
+
+/** ¿Pasa el clip los filtros activos? OR dentro de cada dimensión, AND entre dimensiones. */
+export function matchesFilters(c: DerivedClip, filters: Set<ClipFilter>): boolean {
+  if (filters.size === 0) return true;
+  let teamActive = false, actionActive = false, zoneActive = false;
+  for (const f of filters) {
+    if (f === 'HOME' || f === 'AWAY') teamActive = true;
+    else if (f.startsWith('Z:')) zoneActive = true;
+    else if (ACTION_KEYS.has(f)) actionActive = true;
+  }
+
+  const teamOk = !teamActive
+    || (filters.has('HOME') && c.side === 'HOME')
+    || (filters.has('AWAY') && c.side === 'AWAY');
+
+  const ak = clipActionKey(c);
+  const actionOk = !actionActive || (ak != null && filters.has(ak));
+
+  const zoneOk = !zoneActive || (c.origin != null && filters.has(`Z:${c.origin}` as ClipFilter));
+
+  return teamOk && actionOk && zoneOk;
+}
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
@@ -71,28 +122,10 @@ export function deriveClips(
       return {
         eventId: e.id, in: inPt, out: outPt, label,
         side: e.side, type: e.type, outcome: e.outcome,
+        origin: e.origin ?? null,
         isGoal: e.type === EventType.SHOT && e.outcome === ShotOutcome.GOAL,
         isTurnover: e.type === EventType.TURNOVER,
         edited: ov.in != null || ov.out != null,
       };
     });
-}
-
-/**
- * ¿Pasa el clip los filtros activos? Dentro de cada dimensión los filtros suman (OR); entre
- * dimensiones se cruzan (AND). Sin filtros de una dimensión, esa dimensión no restringe.
- */
-export function matchesFilters(c: DerivedClip, filters: Set<ClipFilter>): boolean {
-  if (filters.size === 0) return true;
-  const teamActive = filters.has('HOME') || filters.has('AWAY');
-  const typeActive = filters.has('GOALS') || filters.has('TURNOVERS');
-
-  const teamOk = !teamActive
-    || (filters.has('HOME') && c.side === 'HOME')
-    || (filters.has('AWAY') && c.side === 'AWAY');
-  const typeOk = !typeActive
-    || (filters.has('GOALS') && c.isGoal)
-    || (filters.has('TURNOVERS') && c.isTurnover);
-
-  return teamOk && typeOk;
 }

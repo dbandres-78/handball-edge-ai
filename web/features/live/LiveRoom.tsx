@@ -147,6 +147,11 @@ export function LiveRoom({ match }: { match: LoadedMatch }) {
     setEvents(next);
     void persistence.record(next);
   };
+  const editEvent = (id: number, patch: Partial<UiEvent>) => {
+    const next = events.map((e) => (e.id === id ? { ...e, ...patch } : e));
+    setEvents(next);
+    void persistence.record(next);
+  };
 
   const onSave = useCallback(async () => {
     const ok = await persistence.flush();
@@ -285,7 +290,7 @@ export function LiveRoom({ match }: { match: LoadedMatch }) {
         </div>
       </div>
 
-      <EventLog events={events} home={home} away={away} seek={() => { /* en directo no hay a dónde saltar */ }} delEvent={delEvent} />
+      <EventLog events={events} home={home} away={away} seek={() => { /* en directo no hay a dónde saltar */ }} delEvent={delEvent} editEvent={editEvent} />
     </div>
   );
 }

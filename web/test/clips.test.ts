@@ -79,7 +79,7 @@ check('quedan ordenados por tiempo', () => {
 // ── Filtros ────────────────────────────────────────────────────────────────
 const clip = (patch: Partial<DerivedClip>): DerivedClip => ({
   eventId: 1, in: 0, out: 10, label: '', side: 'HOME',
-  type: EventType.SHOT, outcome: ShotOutcome.GOAL, isGoal: true, isTurnover: false, edited: false, ...patch,
+  type: EventType.SHOT, outcome: ShotOutcome.GOAL, origin: null, isGoal: true, isTurnover: false, edited: false, ...patch,
 });
 const F = (...f: ClipFilter[]) => new Set<ClipFilter>(f);
 
@@ -93,22 +93,46 @@ check('LOCAL/VISITANTE filtran por equipo', () => {
   assert.equal(matchesFilters(clip({ side: 'AWAY' }), F('AWAY')), true);
 });
 
-check('GOLES/PÉRDIDAS filtran por tipo', () => {
-  assert.equal(matchesFilters(clip({ isGoal: true, isTurnover: false }), F('GOALS')), true);
-  assert.equal(matchesFilters(clip({ isGoal: false, isTurnover: true }), F('GOALS')), false);
-  assert.equal(matchesFilters(clip({ isGoal: false, isTurnover: true }), F('TURNOVERS')), true);
+check('filtro por acción: cada resultado de tiro y cada tipo', () => {
+  const goal = clip({ type: EventType.SHOT, outcome: ShotOutcome.GOAL });
+  const saved = clip({ type: EventType.SHOT, outcome: ShotOutcome.SAVED });
+  const missed = clip({ type: EventType.SHOT, outcome: ShotOutcome.MISSED });
+  const blocked = clip({ type: EventType.SHOT, outcome: ShotOutcome.BLOCKED });
+  const turnover = clip({ type: EventType.TURNOVER, outcome: null });
+  const steal = clip({ type: EventType.STEAL, outcome: null });
+  const yellow = clip({ type: EventType.YELLOW_CARD, outcome: null });
+  const red = clip({ type: EventType.RED_CARD, outcome: null });
+  assert.equal(matchesFilters(goal, F('GOAL')), true);
+  assert.equal(matchesFilters(saved, F('GOAL')), false);
+  assert.equal(matchesFilters(saved, F('SAVED')), true);
+  assert.equal(matchesFilters(missed, F('MISSED')), true);
+  assert.equal(matchesFilters(blocked, F('BLOCKED')), true);
+  assert.equal(matchesFilters(turnover, F('TURNOVER')), true);
+  assert.equal(matchesFilters(steal, F('STEAL')), true);
+  assert.equal(matchesFilters(yellow, F('YELLOW')), true);
+  assert.equal(matchesFilters(red, F('RED')), true);
+  // OR dentro de la dimensión acción: parada o fuera
+  assert.equal(matchesFilters(saved, F('SAVED', 'MISSED')), true);
+  assert.equal(matchesFilters(missed, F('SAVED', 'MISSED')), true);
+  assert.equal(matchesFilters(goal, F('SAVED', 'MISSED')), false);
 });
 
-check('dimensiones se cruzan (AND): LOCAL + GOLES = gol local', () => {
-  assert.equal(matchesFilters(clip({ side: 'HOME', isGoal: true }), F('HOME', 'GOALS')), true);
-  assert.equal(matchesFilters(clip({ side: 'AWAY', isGoal: true }), F('HOME', 'GOALS')), false);
-  assert.equal(matchesFilters(clip({ side: 'HOME', isGoal: false, isTurnover: true }), F('HOME', 'GOALS')), false);
+check('filtro por zona de tiro (solo tiros con origen)', () => {
+  const wingL = clip({ type: EventType.SHOT, outcome: ShotOutcome.GOAL, origin: ShotOrigin.WING_LEFT });
+  const nineC = clip({ type: EventType.SHOT, outcome: ShotOutcome.SAVED, origin: ShotOrigin.NINE_CENTER });
+  const noOrigin = clip({ type: EventType.TURNOVER, outcome: null, origin: null });
+  assert.equal(matchesFilters(wingL, F('Z:WING_LEFT')), true);
+  assert.equal(matchesFilters(wingL, F('Z:NINE_CENTER')), false);
+  assert.equal(matchesFilters(nineC, F('Z:NINE_CENTER')), true);
+  assert.equal(matchesFilters(noOrigin, F('Z:WING_LEFT')), false); // sin origen, no pasa el filtro de zona
 });
 
-check('dentro de una dimensión suman (OR): GOLES + PÉRDIDAS = gol o pérdida', () => {
-  assert.equal(matchesFilters(clip({ isGoal: true, isTurnover: false }), F('GOALS', 'TURNOVERS')), true);
-  assert.equal(matchesFilters(clip({ isGoal: false, isTurnover: true }), F('GOALS', 'TURNOVERS')), true);
-  assert.equal(matchesFilters(clip({ isGoal: false, isTurnover: false }), F('GOALS', 'TURNOVERS')), false);
+check('dimensiones se cruzan (AND): LOCAL + GOL + zona', () => {
+  const homeGoalWing = clip({ side: 'HOME', type: EventType.SHOT, outcome: ShotOutcome.GOAL, origin: ShotOrigin.WING_LEFT });
+  assert.equal(matchesFilters(homeGoalWing, F('HOME', 'GOAL', 'Z:WING_LEFT')), true);
+  assert.equal(matchesFilters(homeGoalWing, F('AWAY', 'GOAL')), false);
+  assert.equal(matchesFilters(homeGoalWing, F('HOME', 'SAVED')), false);
+  assert.equal(matchesFilters(homeGoalWing, F('HOME', 'GOAL', 'Z:NINE_CENTER')), false);
 });
 
 console.log(`\n${pass} passed, ${fail} failed`);

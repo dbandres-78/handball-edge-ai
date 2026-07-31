@@ -162,6 +162,12 @@ export function AnalysisRoom({ match }: { match: LoadedMatch }) {
     setSelectedClips((prev) => { if (!prev.has(id)) return prev; const n = new Set(prev); n.delete(id); return n; });
     setClipOverrides((prev) => { if (!(id in prev)) return prev; const n = { ...prev }; delete n[id]; return n; });
   };
+  // Editar una jugada ya registrada (corregir un click mal tecleado). Recompone todo desde eventos.
+  const editEvent = (id: number, patch: Partial<UiEvent>) => {
+    const next = events.map((e) => (e.id === id ? { ...e, ...patch } : e));
+    setEvents(next);
+    void persistence.record(next);
+  };
 
   // Pase a 10 m: evento de EQUIPO que se suma al que ataca (`side`). Reutiliza tag() (persistencia,
   // orden, flash, paridad). Shift lo dispara; el −1 corrige la última pulsación de ese equipo.
@@ -344,7 +350,7 @@ export function AnalysisRoom({ match }: { match: LoadedMatch }) {
         </div>
       </div>
 
-      <EventLog events={events} home={home} away={away} seek={seek} delEvent={delEvent} />
+      <EventLog events={events} home={home} away={away} seek={seek} delEvent={delEvent} editEvent={editEvent} />
     </div>
   );
 }

@@ -14,7 +14,7 @@ const CY = 146;
 const R6 = 46;       // 6 m
 const R9 = 84;       // 9 m
 
-// Cortes angulares (grados; 180 = izquierda, 0 = derecha)
+// Cortes angulares (grados; 180 = izquierda de PANTALLA, 0 = derecha de pantalla)
 const A = { wingL: [180, 146], left: [146, 110], center: [110, 70], right: [70, 34], wingR: [34, 0] };
 
 const pt = (deg: number, r: number) => {
@@ -39,23 +39,26 @@ interface ZoneDef { key: ShotOrigin; label: string; short: string; d: string; lx
 
 const mid = (a: number[], r: number) => pt((a[0] + a[1]) / 2, r);
 
+// IMPORTANTE: las zonas se nombran desde el ATAQUE (extremo izquierdo = izquierda del atacante),
+// pero el mapa se dibuja como se ve desde detrás de la portería defendida. Por eso el lado
+// izquierdo del ataque (EI, 6I, 9I) va a la DERECHA de la pantalla y viceversa. Los centros no cambian.
 export const ZONES: ZoneDef[] = [
   { key: ShotOrigin.WING_LEFT, label: 'Extremo izquierda', short: 'EI',
-    d: sector(A.wingL[0], A.wingL[1], 0, R9), ...xy(mid(A.wingL, R9 * 0.62)) },
+    d: sector(A.wingR[0], A.wingR[1], 0, R9), ...xy(mid(A.wingR, R9 * 0.62)) },
   { key: ShotOrigin.SIX_LEFT, label: '6 m izquierda', short: '6I',
-    d: sector(A.left[0], A.left[1], 0, R6), ...xy(mid(A.left, R6 * 0.62)) },
+    d: sector(A.right[0], A.right[1], 0, R6), ...xy(mid(A.right, R6 * 0.62)) },
   { key: ShotOrigin.SIX_CENTER, label: '6 m centro', short: '6C',
     d: sector(A.center[0], A.center[1], 0, R6), ...xy(mid(A.center, R6 * 0.62)) },
   { key: ShotOrigin.SIX_RIGHT, label: '6 m derecha', short: '6D',
-    d: sector(A.right[0], A.right[1], 0, R6), ...xy(mid(A.right, R6 * 0.62)) },
+    d: sector(A.left[0], A.left[1], 0, R6), ...xy(mid(A.left, R6 * 0.62)) },
   { key: ShotOrigin.WING_RIGHT, label: 'Extremo derecha', short: 'ED',
-    d: sector(A.wingR[0], A.wingR[1], 0, R9), ...xy(mid(A.wingR, R9 * 0.62)) },
+    d: sector(A.wingL[0], A.wingL[1], 0, R9), ...xy(mid(A.wingL, R9 * 0.62)) },
   { key: ShotOrigin.NINE_LEFT, label: '9 m izquierda', short: '9I',
-    d: sector(A.left[0], A.left[1], R6, R9), ...xy(mid(A.left, (R6 + R9) / 2)) },
+    d: sector(A.right[0], A.right[1], R6, R9), ...xy(mid(A.right, (R6 + R9) / 2)) },
   { key: ShotOrigin.NINE_CENTER, label: '9 m centro', short: '9C',
     d: sector(A.center[0], A.center[1], R6, R9), ...xy(mid(A.center, (R6 + R9) / 2)) },
   { key: ShotOrigin.NINE_RIGHT, label: '9 m derecha', short: '9D',
-    d: sector(A.right[0], A.right[1], R6, R9), ...xy(mid(A.right, (R6 + R9) / 2)) },
+    d: sector(A.left[0], A.left[1], R6, R9), ...xy(mid(A.left, (R6 + R9) / 2)) },
 ];
 
 function xy([lx, ly]: number[]) { return { lx, ly }; }

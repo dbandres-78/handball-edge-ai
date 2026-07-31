@@ -4,7 +4,7 @@ import { Shield, Pencil, X, Plus, ArrowLeftRight, BookMarked, Check, Loader2 } f
 import { PALETTE as C, MONO } from '@/lib/theme';
 import { fmt } from '@/lib/handball/format';
 import { ACTIONS, ActionDef, Tone } from '@/lib/handball/actions';
-import { UiTeam, Side, ShotOrigin, UiEvent, onCourtAt, AttackPhase } from '@/lib/handball/mapping';
+import { UiTeam, Side, ShotOrigin, UiEvent, onCourtAt, AttackPhase, EventType } from '@/lib/handball/mapping';
 import { GoalTarget } from './GoalTarget';
 import { ShotOriginCourt, ORIGIN_LABEL } from './ShotOriginCourt';
 import { saveToCatalog } from './actions';
@@ -312,7 +312,7 @@ export function TagPanel(p: Props) {
       </div>
 
       <div className="grid grid-cols-2 gap-1.5">
-        {ACTIONS.map((a) => (
+        {ACTIONS.filter((a) => a.type !== EventType.NEAR_PASS).map((a) => (
           <button key={a.key} onClick={() => p.tag(a)} className="py-2.5 rounded-md text-sm flex items-center justify-center gap-1.5" style={{ background: C.panel2, border: `1px solid ${C.line}`, color: C.text, fontWeight: 500 }}>
             <span className="w-2 h-2 rounded-full" style={{ background: TONE[a.tone] }} />{a.label}
           </button>
