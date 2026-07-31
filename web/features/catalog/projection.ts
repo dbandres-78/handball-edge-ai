@@ -27,6 +27,7 @@ export interface PlayerCard {
 }
 export interface TeamCard {
   games: number; wins: number; draws: number; losses: number;
+  playScoreTotal: number; playScoreAvg: number | null;   // suma del Play Score de los jugadores (y media por partido)
   goalsFor: number; goalsAgainst: number; goalsForAvg: number | null; goalsAgainstAvg: number | null;
   possessionsAvg: number | null; turnoverPct: number | null; shootingPct: number | null;
   phaseEff: { positional: number | null; counter: number | null };
@@ -125,8 +126,11 @@ export function buildClubProjection(matches: LoadedMatch[], clubId: string, seas
     },
   })).sort((x, y) => y.playScoreTotal - x.playScoreTotal);
 
+  const teamPlayScore = playerCards.reduce((s, p) => s + p.playScoreTotal, 0);
   const team: TeamCard = {
     games, wins, draws, losses,
+    playScoreTotal: round2(teamPlayScore),
+    playScoreAvg: games > 0 ? round2(teamPlayScore / games) : null,
     goalsFor: gf, goalsAgainst: ga,
     goalsForAvg: games > 0 ? round1(gf / games) : null,
     goalsAgainstAvg: games > 0 ? round1(ga / games) : null,

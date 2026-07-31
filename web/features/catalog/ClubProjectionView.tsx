@@ -85,6 +85,7 @@ function TeamCardView({ proj }: { proj: ClubProjection }) {
         <span style={{ fontFamily: MONO, fontSize: 13, color: C.text }}>{t.games} partidos</span>
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <Stat label="Play Score equipo" value={`${t.playScoreTotal}`} sub={`${N(t.playScoreAvg)}/pt`} big />
         <Stat label="Récord (V-E-D)" value={`${t.wins}-${t.draws}-${t.losses}`} big />
         <Stat label="Goles a favor /pt" value={N(t.goalsForAvg)} sub={`${t.goalsFor} tot.`} />
         <Stat label="Goles en contra /pt" value={N(t.goalsAgainstAvg)} sub={`${t.goalsAgainst} tot.`} />
@@ -130,11 +131,12 @@ function PlayerRow({ pl }: { pl: PlayerCard }) {
       {open && (
         <div className="px-3 pb-3 pt-1" style={{ borderTop: `1px solid ${C.line}` }}>
           <div className="grid grid-cols-3 sm:grid-cols-4 gap-2.5 mt-2">
+            <Stat label="Play Score" value={`${pl.playScoreTotal}`} sub={`${N(pl.playScoreAvg)}/pt`} />
+            <Stat label="± total" value={`${pl.plusMinusTotal >= 0 ? '+' : ''}${pl.plusMinusTotal}`} sub={`${N(pl.plusMinusAvg)}/pt`} />
             <Stat label="Goles" value={`${pl.goals}`} sub={`${pl.shots} tiros`} />
             <Stat label="% acierto" value={P(pl.shotPct)} />
             <Stat label="Pérdidas" value={`${pl.turnovers}`} sub={`${P(pl.turnoverRate)} por pos.`} />
             <Stat label="Recuperaciones" value={`${pl.steals}`} />
-            <Stat label="± total" value={`${pl.plusMinusTotal >= 0 ? '+' : ''}${pl.plusMinusTotal}`} sub={`${N(pl.plusMinusAvg)}/pt`} />
             <Stat label="xG" value={`${pl.xg}`} />
           </div>
           <div className="mt-3 pt-2" style={{ borderTop: `1px solid ${C.line}` }}>

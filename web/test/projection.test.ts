@@ -56,6 +56,10 @@ check('ficha de equipo: récord, goles y medias', () => {
   assert.equal(p.team.goalsFor, 2);
   assert.equal(p.team.goalsAgainst, 0);
   assert.equal(p.team.goalsForAvg, 1);
+  // Play Score del equipo = suma de los de sus jugadores.
+  const sumPS = p.players.reduce((s, x) => s + x.playScoreTotal, 0);
+  assert.equal(p.team.playScoreTotal, Math.round(sumPS * 100) / 100);
+  assert.equal(p.team.playScoreAvg, Math.round((p.team.playScoreTotal / p.team.games) * 100) / 100);
 });
 
 check('ficha de jugador: agregación y eficacias on-court por fase', () => {
