@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Radio, Film } from 'lucide-react';
+import { Radio, Film, Users } from 'lucide-react';
 import { PALETTE as C, MONO } from '@/lib/theme';
 import type { MatchListItem, MatchStatus } from './types';
 import { NewLiveMatch } from './NewLiveMatch';
@@ -19,6 +19,9 @@ export function MatchLibrary({ items }: { items: MatchListItem[] }) {
         <h1 style={{ fontSize: 22, fontWeight: 700, color: C.text }}>Biblioteca de partidos</h1>
         <div className="flex items-center gap-3">
           <span style={{ fontFamily: MONO, fontSize: 12, color: C.faint }}>{items.length} partidos</span>
+          <Link href="/clubs" className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm" style={{ border: `1px solid ${C.line}`, color: C.text }}>
+            <Users size={14} /> Clubes y fichas
+          </Link>
           <NewVideoMatch />
           <NewLiveMatch />
         </div>

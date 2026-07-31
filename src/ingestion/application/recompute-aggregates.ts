@@ -1,7 +1,7 @@
 import { AttackPhase, EventType, MatchEvent, ShotOrigin, ShotOutcome, ShotPayload, SubstitutionPayload, TurnoverPayload } from '../domain/match-event';
 import { computePlayScore } from './play-score';
 import { computeXg } from './xg';
-import { MatchSummary, OriginBreakdown, PlayerLine, TeamSummary } from './read-models';
+import { MatchSummary, OnCourtSplits, OriginBreakdown, PlayerLine, TeamSummary } from './read-models';
 import { ResolvedRoster, ResolvedTeam } from './ports/repositories';
 
 interface PlayerAcc {
@@ -11,7 +11,14 @@ interface PlayerAcc {
   plusMinus: number;
   xg: number; xgot: number;
   byOrigin: OriginBreakdown;
+  oc: OnCourtSplits;
 }
+
+const emptyOnCourt = (): OnCourtSplits => ({
+  offPoss: 0, defPoss: 0,
+  offPosPoss: 0, offPosGoals: 0, offCntPoss: 0, offCntGoals: 0,
+  defPosPoss: 0, defPosGoals: 0, defCntPoss: 0, defCntGoals: 0,
+});
 
 /** Suma un tiro a su zona de origen. Sin origen anotado, el tiro no entra en el desglose. */
 function addOrigin(bag: OriginBreakdown, origin: ShotOrigin | undefined, outcome: ShotOutcome): void {
@@ -34,6 +41,7 @@ const emptyPlayerAcc = (): PlayerAcc => ({
   plusMinus: 0,
   xg: 0, xgot: 0,
   byOrigin: {},
+  oc: emptyOnCourt(),
 });
 
 /**
@@ -110,6 +118,21 @@ export function recomputeAggregates(
     inc(teamPoss, teamId);
     if (phase === AttackPhase.POSITIONAL) { inc(teamPossPos, teamId); if (scored) inc(teamGoalsPos, teamId); }
     else if (phase === AttackPhase.COUNTER) { inc(teamPossCounter, teamId); if (scored) inc(teamGoalsCounter, teamId); }
+
+    // On-court: atribuye la posesión (y el gol) a los jugadores en pista de ambos equipos.
+    const oppId = opponentTeamId.get(teamId);
+    for (const pid of onCourt.get(teamId) ?? []) {
+      const a = playerAcc.get(pid); if (!a) continue;
+      a.oc.offPoss++;
+      if (phase === AttackPhase.POSITIONAL) { a.oc.offPosPoss++; if (scored) a.oc.offPosGoals++; }
+      else if (phase === AttackPhase.COUNTER) { a.oc.offCntPoss++; if (scored) a.oc.offCntGoals++; }
+    }
+    if (oppId) for (const pid of onCourt.get(oppId) ?? []) {
+      const a = playerAcc.get(pid); if (!a) continue;
+      a.oc.defPoss++;
+      if (phase === AttackPhase.POSITIONAL) { a.oc.defPosPoss++; if (scored) a.oc.defPosGoals++; }
+      else if (phase === AttackPhase.COUNTER) { a.oc.defCntPoss++; if (scored) a.oc.defCntGoals++; }
+    }
   };
 
   for (const ev of events) {
@@ -289,6 +312,7 @@ export function recomputeAggregates(
       turnovers: a.turnovers, steals: a.steals, blocks: a.blocks, fouls: a.fouls,
       twoMinutes: a.twoMinutes, yellowCards: a.yellowCards, redCards: a.redCards,
       plusMinus: a.plusMinus,
+      onCourt: a.oc,
       playScore: computePlayScore({
         goals: a.goals, misses: a.misses, turnovers: a.turnovers, saves: a.saves,
         steals: a.steals, blocks: a.blocks, fouls: a.fouls,

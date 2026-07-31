@@ -61,7 +61,22 @@ export interface PlayerLine {
   yellowCards: number;
   redCards: number;
   plusMinus: number;            // diferencial de goles del equipo mientras el jugador está en pista (±)
+  onCourt: OnCourtSplits;       // posesiones/goles atribuidos por estar en pista (on/off por fase)
   playScore: PlayScore;
+}
+
+/**
+ * Posesiones y goles atribuidos a un jugador por estar EN PISTA. Base de la eficacia on/off por
+ * fase de la ficha: ofensiva=ataque posicional, contra=contraataque, defensiva=defensa posicional,
+ * repliegue=defensa vs contraataque rival. Las posesiones cerradas por robo entran en offPoss/defPoss
+ * (totales) pero no en el desglose por fase.
+ */
+export interface OnCourtSplits {
+  offPoss: number; defPoss: number;
+  offPosPoss: number; offPosGoals: number;
+  offCntPoss: number; offCntGoals: number;
+  defPosPoss: number; defPosGoals: number;
+  defCntPoss: number; defCntGoals: number;
 }
 
 export interface TeamSummary {

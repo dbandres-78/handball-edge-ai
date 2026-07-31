@@ -60,6 +60,7 @@ export type {
   PlayScoreTerm,
   PlayScore,
   PlayerLine,
+  OnCourtSplits,
   TeamSummary,
   MatchSummary,
 } from './application/read-models';
