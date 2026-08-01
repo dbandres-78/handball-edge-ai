@@ -29,7 +29,7 @@ export default function Home() {
             Análisis de balonmano: directo, scouting en vídeo, estadística y fichas.
           </p>
           <p style={{ marginTop: 4, fontSize: 12, color: EBRO.muted, letterSpacing: 1 }}>
-            por <b style={{ color: EBRO.white }}>Daniel Andrés</b> · creador
+            por <b style={{ color: EBRO.white }}>Daniel Bandrés</b> · creador
           </p>
         </div>
 
