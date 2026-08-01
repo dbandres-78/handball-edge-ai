@@ -1,5 +1,5 @@
 import type {
-  Season, Club, RosterPlayer, NewClubInput, NewRosterPlayerInput, RosterPlayerPatch,
+  Season, Club, RosterPlayer, RosterPlayerRef, NewClubInput, NewRosterPlayerInput, RosterPlayerPatch,
 } from './types';
 
 /**
@@ -23,6 +23,13 @@ export interface CatalogRepository {
   addPlayer(input: NewRosterPlayerInput): Promise<RosterPlayer>;
   updatePlayer(id: string, patch: RosterPlayerPatch): Promise<RosterPlayer | null>;
   removePlayer(id: string): Promise<void>;
+
+  // Identidad global de jugador (carrera entre clubes)
+  getPlayer(id: string): Promise<RosterPlayer | null>;
+  listAllRoster(): Promise<RosterPlayerRef[]>;
+  listByPerson(personId: string): Promise<RosterPlayer[]>;
+  /** Une la identidad del jugador `sourceId` a la de `targetId` (comparten person_id). */
+  mergePersons(sourceId: string, targetId: string): Promise<void>;
 }
 
 /** Id legible + sufijo aleatorio, mismo criterio anticolisión que newMatchId. */
@@ -76,9 +83,16 @@ export const inMemoryCatalogRepo: CatalogRepository = {
       .sort((a, b) => a.number - b.number);
   },
   async addPlayer(input) {
+    // Auto-vínculo: mismo club + mismo dorsal + mismo nombre en otra temporada = misma persona.
+    const norm = (s: string) => s.trim().toLowerCase();
+    const twin = [...roster.values()].find(
+      (r) => r.clubId === input.clubId && r.number === input.number && norm(r.name) === norm(input.name),
+    );
+    const id = newCatalogId('RP');
     const rp: RosterPlayer = {
-      id: newCatalogId('RP'), clubId: input.clubId, season: input.season,
-      number: input.number, name: input.name, position: input.position, active: true,
+      id, clubId: input.clubId, season: input.season,
+      number: input.number, name: input.name, position: input.position,
+      personId: twin?.personId ?? id, active: true,
     };
     roster.set(rp.id, rp);
     return rp;
@@ -92,6 +106,25 @@ export const inMemoryCatalogRepo: CatalogRepository = {
   },
   async removePlayer(id) {
     roster.delete(id);
+  },
+
+  async getPlayer(id) {
+    return roster.get(id) ?? null;
+  },
+  async listAllRoster() {
+    return [...roster.values()]
+      .map((r) => ({ ...r, clubName: clubs.get(r.clubId)?.name ?? '—' }))
+      .sort((a, b) => a.clubName.localeCompare(b.clubName) || b.season.localeCompare(a.season) || a.number - b.number);
+  },
+  async listByPerson(personId) {
+    return [...roster.values()].filter((r) => r.personId === personId)
+      .sort((a, b) => b.season.localeCompare(a.season));
+  },
+  async mergePersons(sourceId, targetId) {
+    const src = roster.get(sourceId); const tgt = roster.get(targetId);
+    if (!src || !tgt || src.personId === tgt.personId) return;
+    const from = src.personId; const to = tgt.personId;
+    for (const r of roster.values()) if (r.personId === from) roster.set(r.id, { ...r, personId: to });
   },
 };
 

@@ -29,7 +29,13 @@ export interface RosterPlayer {
   number: number;
   name: string;
   position?: string;
+  personId: string;   // identidad global (carrera entre clubes); por defecto = id hasta que se vincula
   active: boolean;
+}
+
+/** Jugador de plantilla con el nombre de su club, para listados/selectores de vinculación. */
+export interface RosterPlayerRef extends RosterPlayer {
+  clubName: string;
 }
 
 export interface NewClubInput {

@@ -25,5 +25,13 @@ export async function GET(req: Request, { params }: { params: { clubId: string }
   const season = seasonQ && seasons.includes(seasonQ) ? seasonQ : seasons[0];
   const projection = season ? buildClubProjection(loaded, params.clubId, season) : null;
 
+  // Enriquece cada ficha con su identidad global (person_id) para poder abrir la carrera.
+  if (projection) {
+    await Promise.all(projection.players.map(async (p) => {
+      const rp = await catalog.getPlayer(p.playerId);
+      if (rp) p.personId = rp.personId;
+    }));
+  }
+
   return NextResponse.json({ club, seasons, season, projection });
 }

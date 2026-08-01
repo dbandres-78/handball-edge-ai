@@ -1,9 +1,10 @@
 'use client';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, ChevronDown, ChevronRight, Loader2 } from 'lucide-react';
+import { ArrowLeft, ChevronDown, ChevronRight, Loader2, User, Link2, X, Check } from 'lucide-react';
 import { PALETTE as C, MONO } from '@/lib/theme';
 import type { ClubProjection, PlayerCard } from './projection';
+import type { RosterPlayerRef } from './types';
 
 interface Payload {
   club: { id: string; name: string };
@@ -116,6 +117,7 @@ function TeamCardView({ proj }: { proj: ClubProjection }) {
 
 function PlayerRow({ pl }: { pl: PlayerCard }) {
   const [open, setOpen] = useState(false);
+  const [linking, setLinking] = useState(false);
   return (
     <div className="rounded-md" style={{ background: C.panel, border: `1px solid ${C.line}` }}>
       <button onClick={() => setOpen(!open)} className="w-full flex items-center gap-3 p-2.5 text-left">
@@ -132,6 +134,7 @@ function PlayerRow({ pl }: { pl: PlayerCard }) {
         <div className="px-3 pb-3 pt-1" style={{ borderTop: `1px solid ${C.line}` }}>
           <div className="grid grid-cols-3 sm:grid-cols-4 gap-2.5 mt-2">
             <Stat label="Play Score" value={`${pl.playScoreTotal}`} sub={`${N(pl.playScoreAvg)}/pt`} />
+            <Stat label="Minutos" value={`${pl.minutesTotal}′`} sub={`${N(pl.minutesAvg)}/pt`} />
             <Stat label="± total" value={`${pl.plusMinusTotal >= 0 ? '+' : ''}${pl.plusMinusTotal}`} sub={`${N(pl.plusMinusAvg)}/pt`} />
             <Stat label="Goles" value={`${pl.goals}`} sub={`${pl.shots} tiros`} />
             <Stat label="% acierto" value={P(pl.shotPct)} />
@@ -148,8 +151,19 @@ function PlayerRow({ pl }: { pl: PlayerCard }) {
               <Stat label="Repliegue" value={P(pl.eff.recovery)} />
             </div>
           </div>
+          <div className="flex items-center gap-2 mt-3">
+            <Link href={`/players/${pl.personId}`} className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm"
+              style={{ background: C.panel2, border: `1px solid ${C.line}`, color: C.text }}>
+              <User size={13} /> Ver carrera
+            </Link>
+            <button onClick={() => setLinking(true)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm"
+              style={{ background: C.panel2, border: `1px solid ${C.line}`, color: C.muted }}>
+              <Link2 size={13} /> Vincular jugador
+            </button>
+          </div>
         </div>
       )}
+      {linking && <LinkPlayerModal player={pl} onClose={() => setLinking(false)} />}
     </div>
   );
 }
@@ -160,6 +174,76 @@ function Stat({ label, value, sub, big }: { label: string; value: string; sub?: 
       <div style={{ fontSize: 10, color: C.faint, marginBottom: 2 }}>{label}</div>
       <div style={{ fontFamily: MONO, fontSize: big ? 18 : 15, fontWeight: 700, color: C.text }}>{value}</div>
       {sub && <div style={{ fontSize: 10, color: C.faint }}>{sub}</div>}
+    </div>
+  );
+}
+
+function LinkPlayerModal({ player, onClose }: { player: PlayerCard; onClose: () => void }) {
+  const [all, setAll] = useState<RosterPlayerRef[] | null>(null);
+  const [q, setQ] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    fetch('/api/catalog/players').then((r) => r.json()).then((d) => { if (alive) setAll(d.players ?? []); });
+    return () => { alive = false; };
+  }, []);
+
+  // Candidatos: cualquier jugador que no sea este ni ya la misma persona.
+  const candidates = (all ?? []).filter((r) => r.id !== player.playerId && r.personId !== player.personId);
+  const filtered = q.trim()
+    ? candidates.filter((r) => `${r.name} ${r.clubName} ${r.season} ${r.number}`.toLowerCase().includes(q.trim().toLowerCase()))
+    : candidates;
+
+  const link = async (targetId: string) => {
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/catalog/players/${player.playerId}/link`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ targetId }),
+      });
+      if (res.ok) { setDone(true); setTimeout(() => { onClose(); }, 900); }
+    } finally { setBusy(false); }
+  };
+
+  return (
+    <div className="fixed inset-0 flex items-center justify-center p-4" style={{ background: 'rgba(5,8,14,.7)', zIndex: 60 }}>
+      <div className="w-full rounded-xl p-4 flex flex-col gap-3" style={{ maxWidth: 460, maxHeight: '82vh', background: C.panel, border: `1px solid ${C.line}` }}>
+        <div className="flex items-center justify-between">
+          <span style={{ fontSize: 14, fontWeight: 700, color: C.text }}>Vincular #{player.number} {player.name}</span>
+          <button onClick={onClose} style={{ color: C.faint }}><X size={16} /></button>
+        </div>
+        <p style={{ fontSize: 12, color: C.muted }}>
+          Marca al mismo jugador en otro club o temporada: pasarán a compartir carrera. Es manual y reversible re-vinculando.
+        </p>
+        {done ? (
+          <div className="flex items-center gap-2 py-6 justify-center" style={{ color: C.pos }}>
+            <Check size={18} /> Vinculado
+          </div>
+        ) : (
+          <>
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar por nombre, club o temporada…"
+              className="w-full px-3 py-2 rounded-md text-sm" style={{ background: C.panel2, border: `1px solid ${C.line}`, color: C.text }} />
+            <div className="flex flex-col gap-1 overflow-y-auto" style={{ maxHeight: '46vh' }}>
+              {all == null ? (
+                <div className="flex items-center gap-2 py-6 justify-center" style={{ color: C.faint }}><Loader2 size={15} className="animate-spin" /> Cargando…</div>
+              ) : filtered.length === 0 ? (
+                <div className="text-center py-6" style={{ color: C.faint, fontSize: 12 }}>No hay otros jugadores para vincular.</div>
+              ) : filtered.map((r) => (
+                <button key={r.id} disabled={busy} onClick={() => link(r.id)}
+                  className="flex items-center gap-2 p-2 rounded-md text-left" style={{ background: C.panel2, border: `1px solid ${C.line}` }}>
+                  <span style={{ fontFamily: MONO, fontSize: 12, color: C.text, width: 28 }}>#{r.number}</span>
+                  <span className="flex-1 min-w-0">
+                    <span className="block truncate" style={{ fontSize: 13, color: C.text }}>{r.name}</span>
+                    <span style={{ fontSize: 11, color: C.faint }}>{r.clubName} · {r.season}</span>
+                  </span>
+                  <Link2 size={14} color={C.muted} />
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }

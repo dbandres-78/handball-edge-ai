@@ -9,6 +9,7 @@ interface PlayerAcc {
   turnovers: number; steals: number; blocks: number; fouls: number;
   twoMinutes: number; yellowCards: number; redCards: number;
   plusMinus: number;
+  msOnCourt: number;
   xg: number; xgot: number;
   byOrigin: OriginBreakdown;
   oc: OnCourtSplits;
@@ -39,6 +40,7 @@ const emptyPlayerAcc = (): PlayerAcc => ({
   turnovers: 0, steals: 0, blocks: 0, fouls: 0,
   twoMinutes: 0, yellowCards: 0, redCards: 0,
   plusMinus: 0,
+  msOnCourt: 0,
   xg: 0, xgot: 0,
   byOrigin: {},
   oc: emptyOnCourt(),
@@ -106,6 +108,21 @@ export function recomputeAggregates(
     if (p.position === 'GK' && !currentGk.get(p.teamId)) currentGk.set(p.teamId, p.playerId);
   }
 
+  // ── Minutos jugados: integral del tiempo en pista ────────────────────────────────
+  // Titulares entran en t=0; los cambios y el cambio de portero mueven el cinco. El fin de
+  // partido es la última acción registrada (proxy desde los eventos). Las exclusiones de 2' y
+  // las expulsiones no se descuentan en esta versión.
+  const enterTime = new Map<string, number>();
+  for (const set of onCourt.values()) for (const pid of set) enterTime.set(pid, 0);
+  const leaveCourt = (pid: string, t: number) => {
+    const start = enterTime.get(pid);
+    if (start == null) return;
+    const a = playerAcc.get(pid);
+    if (a) a.msOnCourt += Math.max(0, t - start);
+    enterTime.delete(pid);
+  };
+  const enterCourt = (pid: string, t: number) => { enterTime.set(pid, t); };
+
   // ── Posesiones (por cambio real de balón) y fase ────────────────────────────────
   // Una posesión de un equipo termina cuando pierde el balón: tira (SHOT), lo pierde
   // (TURNOVER) o se lo roban (STEAL del rival). Se sigue quién tiene el balón (`holder`)
@@ -142,8 +159,8 @@ export function recomputeAggregates(
         const sub = ev.payload as unknown as SubstitutionPayload;
         const set = onCourt.get(ev.teamId);
         if (set) {
-          if (sub.playerOutId) set.delete(sub.playerOutId);
-          if (sub.playerInId) set.add(sub.playerInId);
+          if (sub.playerOutId) { set.delete(sub.playerOutId); leaveCourt(sub.playerOutId, ev.gameClockMs); }
+          if (sub.playerInId) { set.add(sub.playerInId); enterCourt(sub.playerInId, ev.gameClockMs); }
         }
         break;
       }
@@ -153,8 +170,8 @@ export function recomputeAggregates(
           const set = onCourt.get(ev.teamId);
           const prev = currentGk.get(ev.teamId);
           if (set) {
-            if (prev && prev !== ev.playerId) set.delete(prev);
-            set.add(ev.playerId);
+            if (prev && prev !== ev.playerId) { set.delete(prev); leaveCourt(prev, ev.gameClockMs); }
+            set.add(ev.playerId); enterCourt(ev.playerId, ev.gameClockMs);
           }
           currentGk.set(ev.teamId, ev.playerId);
         }
@@ -247,6 +264,10 @@ export function recomputeAggregates(
     }
   }
 
+  // Fin de partido: cierra el tiempo en pista de quien sigue jugando (última acción como final).
+  const matchEnd = events.reduce((mx, e) => (e.gameClockMs > mx ? e.gameClockMs : mx), 0);
+  for (const pid of [...enterTime.keys()]) leaveCourt(pid, matchEnd);
+
   const opponentOf = (teamId: string): ResolvedTeam | undefined =>
     roster.teams.find(t => t.teamId !== teamId);
 
@@ -312,6 +333,7 @@ export function recomputeAggregates(
       turnovers: a.turnovers, steals: a.steals, blocks: a.blocks, fouls: a.fouls,
       twoMinutes: a.twoMinutes, yellowCards: a.yellowCards, redCards: a.redCards,
       plusMinus: a.plusMinus,
+      minutesPlayed: Math.round((a.msOnCourt / 60000) * 10) / 10,
       onCourt: a.oc,
       playScore: computePlayScore({
         goals: a.goals, misses: a.misses, turnovers: a.turnovers, saves: a.saves,

@@ -61,6 +61,7 @@ export interface PlayerLine {
   yellowCards: number;
   redCards: number;
   plusMinus: number;            // diferencial de goles del equipo mientras el jugador está en pista (±)
+  minutesPlayed: number;        // minutos en pista (integral desde titulares + cambios; fin = última acción)
   onCourt: OnCourtSplits;       // posesiones/goles atribuidos por estar en pista (on/off por fase)
   playScore: PlayScore;
 }

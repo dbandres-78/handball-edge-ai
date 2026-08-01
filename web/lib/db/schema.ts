@@ -73,13 +73,14 @@ CREATE TABLE IF NOT EXISTS club (
 -- La plantilla es POR temporada: un jugador pertenece a un club en una temporada
 -- concreta, con su dorsal de esa temporada. (club_id, season) acota su pertenencia.
 CREATE TABLE IF NOT EXISTS roster_player (
-  id       text PRIMARY KEY,
-  club_id  text NOT NULL,
-  season   text NOT NULL,               -- referencia lógica a season.code
-  number   int  NOT NULL,
-  name     text NOT NULL,
-  position text,
-  active   boolean NOT NULL DEFAULT true
+  id        text PRIMARY KEY,
+  club_id   text NOT NULL,
+  season    text NOT NULL,               -- referencia lógica a season.code
+  number    int  NOT NULL,
+  name      text NOT NULL,
+  position  text,
+  person_id text,                         -- identidad global de la persona (carrera entre clubes), por defecto = id
+  active    boolean NOT NULL DEFAULT true
 );
 `;
 

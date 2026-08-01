@@ -1,5 +1,5 @@
 import type {
-  Season, Club, RosterPlayer, NewClubInput, NewRosterPlayerInput, RosterPlayerPatch,
+  Season, Club, RosterPlayer, RosterPlayerRef, NewClubInput, NewRosterPlayerInput, RosterPlayerPatch,
 } from '../../features/catalog/types';
 import type { CatalogRepository } from '../../features/catalog/repository';
 import { newCatalogId } from '../../features/catalog/repository';
@@ -12,7 +12,7 @@ const rowToClub = (r: any): Club => ({
 
 const rowToPlayer = (r: any): RosterPlayer => ({
   id: r.id, clubId: r.club_id, season: r.season, number: r.number, name: r.name,
-  position: r.position ?? undefined, active: !!r.active,
+  position: r.position ?? undefined, personId: r.person_id ?? r.id, active: !!r.active,
 });
 
 export interface PgCatalogRepository extends CatalogRepository {
@@ -73,13 +73,23 @@ export function makePgCatalogRepository(db: Queryable): PgCatalogRepository {
       return rows.map(rowToPlayer);
     },
     async addPlayer(input: NewRosterPlayerInput) {
+      // Auto-vínculo: mismo club + dorsal + nombre en otra temporada = misma persona.
+      // (Normalización del nombre en JS: pg-mem no implementa trim/lower.)
+      const norm = (s: string) => s.trim().toLowerCase();
+      const candidates = (await db.query(
+        'SELECT person_id, name FROM roster_player WHERE club_id=$1 AND number=$2',
+        [input.clubId, input.number],
+      )).rows;
+      const twin = candidates.find((r) => norm(r.name) === norm(input.name));
+      const id = newCatalogId('RP');
+      const personId: string = twin?.person_id ?? id;
       const rp: RosterPlayer = {
-        id: newCatalogId('RP'), clubId: input.clubId, season: input.season,
-        number: input.number, name: input.name, position: input.position, active: true,
+        id, clubId: input.clubId, season: input.season,
+        number: input.number, name: input.name, position: input.position, personId, active: true,
       };
       await db.query(
-        'INSERT INTO roster_player(id, club_id, season, number, name, position, active) VALUES ($1,$2,$3,$4,$5,$6,$7)',
-        [rp.id, rp.clubId, rp.season, rp.number, rp.name, rp.position ?? null, rp.active],
+        'INSERT INTO roster_player(id, club_id, season, number, name, position, person_id, active) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)',
+        [rp.id, rp.clubId, rp.season, rp.number, rp.name, rp.position ?? null, rp.personId, rp.active],
       );
       return rp;
     },
@@ -95,6 +105,29 @@ export function makePgCatalogRepository(db: Queryable): PgCatalogRepository {
     },
     async removePlayer(id) {
       await db.query('DELETE FROM roster_player WHERE id=$1', [id]);
+    },
+
+    async getPlayer(id) {
+      const r = (await db.query('SELECT * FROM roster_player WHERE id=$1', [id])).rows[0];
+      return r ? rowToPlayer(r) : null;
+    },
+    async listAllRoster() {
+      const rows = (await db.query(
+        `SELECT rp.*, c.name AS club_name FROM roster_player rp
+         LEFT JOIN club c ON c.id = rp.club_id
+         ORDER BY c.name, rp.season DESC, rp.number`,
+      )).rows;
+      return rows.map((r) => ({ ...rowToPlayer(r), clubName: r.club_name ?? '—' } as RosterPlayerRef));
+    },
+    async listByPerson(personId) {
+      const rows = (await db.query('SELECT * FROM roster_player WHERE person_id=$1 ORDER BY season DESC', [personId])).rows;
+      return rows.map(rowToPlayer);
+    },
+    async mergePersons(sourceId, targetId) {
+      const src = (await db.query('SELECT person_id FROM roster_player WHERE id=$1', [sourceId])).rows[0];
+      const tgt = (await db.query('SELECT person_id FROM roster_player WHERE id=$1', [targetId])).rows[0];
+      if (!src || !tgt || src.person_id === tgt.person_id) return;
+      await db.query('UPDATE roster_player SET person_id=$2 WHERE person_id=$1', [src.person_id, tgt.person_id]);
     },
   };
 
@@ -128,5 +161,9 @@ export function createPgCatalogRepo(): CatalogRepository {
     async addPlayer(i) { await ensure(); return repo.addPlayer(i); },
     async updatePlayer(id, p) { await ensure(); return repo.updatePlayer(id, p); },
     async removePlayer(id) { await ensure(); return repo.removePlayer(id); },
+    async getPlayer(id) { await ensure(); return repo.getPlayer(id); },
+    async listAllRoster() { await ensure(); return repo.listAllRoster(); },
+    async listByPerson(pid) { await ensure(); return repo.listByPerson(pid); },
+    async mergePersons(s, t) { await ensure(); return repo.mergePersons(s, t); },
   };
 }

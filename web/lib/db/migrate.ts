@@ -31,6 +31,14 @@ const MIGRATIONS: Array<{ version: number; description: string; sql: string }> =
       ALTER TABLE player ADD COLUMN IF NOT EXISTS player_id text;
     `,
   },
+  {
+    version: 4,
+    description: 'identidad global de jugador: person_id en roster_player (backfill = su propio id)',
+    sql: `
+      ALTER TABLE roster_player ADD COLUMN IF NOT EXISTS person_id text;
+      UPDATE roster_player SET person_id = id WHERE person_id IS NULL;
+    `,
+  },
 ];
 
 /** Aplica el esquema base + migraciones incrementales. Idempotente. */

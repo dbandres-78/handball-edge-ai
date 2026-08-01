@@ -18,7 +18,7 @@
     "test:video": "tsx test/video-upload.test.ts",
     "test:core": "tsx test/core-barrel.test.ts",
     "test:ingest": "tsx test/ingest-bridge.test.ts",
-    "test": "npm run test:lib && npm run test:db && npm run test:live && npm run test:zones && npm run test:backup && npm run test:render && npm run test:gk && npm run test:pg-persist && npm run test:xg && npm run test:video && npm run test:core && npm run test:ingest && npm run test:id && npm run test:pm && npm run test:sub && npm run test:catalog && npm run test:near && npm run test:catlink && npm run test:del && npm run test:csv && npm run test:clips && npm run test:promote && npm run test:poss && npm run test:oncourt && npm run test:proj",
+    "test": "npm run test:lib && npm run test:db && npm run test:live && npm run test:zones && npm run test:backup && npm run test:render && npm run test:gk && npm run test:pg-persist && npm run test:xg && npm run test:video && npm run test:core && npm run test:ingest && npm run test:id && npm run test:pm && npm run test:sub && npm run test:catalog && npm run test:near && npm run test:catlink && npm run test:del && npm run test:csv && npm run test:clips && npm run test:promote && npm run test:poss && npm run test:oncourt && npm run test:proj && npm run test:identity && npm run test:minutes && npm run test:career",
     "typecheck:lib": "tsc -p tsconfig.lib.json --noEmit",
     "verify:pg": "tsx scripts/verify-real-pg.ts",
     "import:j24": "tsx scripts/e2e-import-pg.ts",
@@ -35,6 +35,9 @@
     "test:poss": "tsx test/possessions.test.ts",
     "test:oncourt": "tsx test/oncourt.test.ts",
     "test:proj": "tsx test/projection.test.ts",
+    "test:identity": "tsx test/player-identity.test.ts",
+    "test:minutes": "tsx test/minutes.test.ts",
+    "test:career": "tsx test/career.test.ts",
     "verify:sub": "tsx scripts/verify-sub-pg.ts",
     "doctor": "tsx scripts/doctor.ts"
   },
