@@ -43,6 +43,7 @@ export function AnalysisRoom({ match }: { match: LoadedMatch }) {
   const [speed, setSpeed] = useState(1);
 
   const [side, setSide] = useState<Side>('HOME');
+  const [autoSwitch, setAutoSwitch] = useState(true);   // cambia de equipo al acabar la posesión
   const [player, setPlayer] = useState(match.home.players[1]?.number ?? match.home.players[0]?.number ?? 0);
   const [period, setPeriod] = useState(1);
   const [zone, setZone] = useState<number | null>(null);
@@ -153,6 +154,10 @@ export function AnalysisRoom({ match }: { match: LoadedMatch }) {
     void persistence.record(next);
     if (a.shot) { setZone(null); setOrigin(null); setBlocker(null); setIsPenalty(false); }
     doFlash(`${a.label} · ${a.teamOnly ? (side === 'HOME' ? home.name : away.name) : '#' + player} · ${fmt(time)}`);
+    // Fin de posesión (tiro o pérdida): la pelota pasa al rival → cambia el equipo activo.
+    if (autoSwitch && (a.type === EventType.SHOT || a.type === EventType.TURNOVER)) {
+      setSide(side === 'HOME' ? 'AWAY' : 'HOME');
+    }
   };
   const delEvent = (id: number) => {
     const next = events.filter((e) => e.id !== id);
@@ -326,7 +331,7 @@ export function AnalysisRoom({ match }: { match: LoadedMatch }) {
 
           <div className="flex-1 min-h-0 overflow-y-auto">
             {tab === 'tag' && (
-              <TagPanel side={side} setSide={setSide} player={player} setPlayer={setPlayer} period={period} setPeriod={setPeriod}
+              <TagPanel side={side} setSide={setSide} autoSwitch={autoSwitch} setAutoSwitch={setAutoSwitch} player={player} setPlayer={setPlayer} period={period} setPeriod={setPeriod}
                 zone={zone} setZone={setZone} origin={origin} setOrigin={setOrigin} blocker={blocker} setBlocker={setBlocker} isPenalty={isPenalty} setIsPenalty={setIsPenalty}
                 phase={phase} setPhase={setPhase}
                 home={home} away={away} setHome={setHome} setAway={setAway}

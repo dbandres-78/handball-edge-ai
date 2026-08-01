@@ -129,6 +129,9 @@ export function makePgCatalogRepository(db: Queryable): PgCatalogRepository {
       if (!src || !tgt || src.person_id === tgt.person_id) return;
       await db.query('UPDATE roster_player SET person_id=$2 WHERE person_id=$1', [src.person_id, tgt.person_id]);
     },
+    async removePersonPlayers(personId) {
+      await db.query('DELETE FROM roster_player WHERE person_id=$1', [personId]);
+    },
   };
 
   return repo;
@@ -165,5 +168,6 @@ export function createPgCatalogRepo(): CatalogRepository {
     async listAllRoster() { await ensure(); return repo.listAllRoster(); },
     async listByPerson(pid) { await ensure(); return repo.listByPerson(pid); },
     async mergePersons(s, t) { await ensure(); return repo.mergePersons(s, t); },
+    async removePersonPlayers(pid) { await ensure(); return repo.removePersonPlayers(pid); },
   };
 }

@@ -17,9 +17,9 @@ type Mode = 'catalog' | 'quick';
  *  · «Rápido»: solo dos nombres y dorsales genéricos, para empezar a anotar antes del saque. La
  *    plantilla se afina dentro de la sala (y en una micro-fase podrá guardarse al catálogo).
  */
-export function NewLiveMatch() {
+export function NewLiveMatch({ defaultOpen = false }: { defaultOpen?: boolean } = {}) {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   const [mode, setMode] = useState<Mode>('catalog');
 
   const [season, setSeason] = useState('26/27');

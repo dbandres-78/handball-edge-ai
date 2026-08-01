@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, ChevronDown, ChevronRight, Loader2, User, Link2, X, Check } from 'lucide-react';
+import { ArrowLeft, ChevronDown, ChevronRight, Loader2, User, Link2, X, Check, Trash2, AlertTriangle } from 'lucide-react';
 import { PALETTE as C, MONO } from '@/lib/theme';
 import type { ClubProjection, PlayerCard } from './projection';
 import type { RosterPlayerRef } from './types';
@@ -20,6 +20,7 @@ export function ClubProjectionView({ clubId }: { clubId: string }) {
   const [data, setData] = useState<Payload | null>(null);
   const [season, setSeason] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     let alive = true;
@@ -31,7 +32,7 @@ export function ClubProjectionView({ clubId }: { clubId: string }) {
       .finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clubId, season]);
+  }, [clubId, season, reloadKey]);
 
   const proj = data?.projection ?? null;
 
@@ -69,7 +70,7 @@ export function ClubProjectionView({ clubId }: { clubId: string }) {
           <TeamCardView proj={proj} />
           <h2 style={{ fontSize: 14, fontWeight: 700, color: C.text, margin: '18px 0 8px' }}>Fichas de jugador</h2>
           <div className="flex flex-col gap-1.5">
-            {proj.players.map((pl) => <PlayerRow key={pl.playerId} pl={pl} />)}
+            {proj.players.map((pl) => <PlayerRow key={pl.playerId} pl={pl} onChanged={() => setReloadKey((k) => k + 1)} />)}
           </div>
         </>
       )}
@@ -115,9 +116,10 @@ function TeamCardView({ proj }: { proj: ClubProjection }) {
   );
 }
 
-function PlayerRow({ pl }: { pl: PlayerCard }) {
+function PlayerRow({ pl, onChanged }: { pl: PlayerCard; onChanged: () => void }) {
   const [open, setOpen] = useState(false);
   const [linking, setLinking] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   return (
     <div className="rounded-md" style={{ background: C.panel, border: `1px solid ${C.line}` }}>
       <button onClick={() => setOpen(!open)} className="w-full flex items-center gap-3 p-2.5 text-left">
@@ -160,10 +162,15 @@ function PlayerRow({ pl }: { pl: PlayerCard }) {
               style={{ background: C.panel2, border: `1px solid ${C.line}`, color: C.muted }}>
               <Link2 size={13} /> Vincular jugador
             </button>
+            <button onClick={() => setDeleting(true)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm ml-auto"
+              style={{ background: 'transparent', border: `1px solid ${C.line}`, color: C.neg }}>
+              <Trash2 size={13} /> Borrar
+            </button>
           </div>
         </div>
       )}
       {linking && <LinkPlayerModal player={pl} onClose={() => setLinking(false)} />}
+      {deleting && <DeletePlayerModal player={pl} onClose={() => setDeleting(false)} onDeleted={() => { setDeleting(false); onChanged(); }} />}
     </div>
   );
 }
@@ -243,6 +250,46 @@ function LinkPlayerModal({ player, onClose }: { player: PlayerCard; onClose: () 
             </div>
           </>
         )}
+      </div>
+    </div>
+  );
+}
+
+function DeletePlayerModal({ player, onClose, onDeleted }: { player: PlayerCard; onClose: () => void; onDeleted: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const del = async (scope: 'season' | 'all') => {
+    setBusy(true);
+    try {
+      const q = scope === 'all' ? '?scope=all' : '';
+      const res = await fetch(`/api/catalog/players/${player.playerId}${q}`, { method: 'DELETE' });
+      if (res.ok) onDeleted();
+    } finally { setBusy(false); }
+  };
+  return (
+    <div className="fixed inset-0 flex items-center justify-center p-4" style={{ background: 'rgba(5,8,14,.7)', zIndex: 60 }}>
+      <div className="w-full rounded-xl p-4 flex flex-col gap-3" style={{ maxWidth: 420, background: C.panel, border: `1px solid ${C.line}` }}>
+        <div className="flex items-center gap-2">
+          <AlertTriangle size={17} color={C.warn} />
+          <span style={{ fontSize: 14, fontWeight: 700, color: C.text }}>Borrar a #{player.number} {player.name}</span>
+          <button onClick={onClose} className="ml-auto" style={{ color: C.faint }}><X size={16} /></button>
+        </div>
+        <p style={{ fontSize: 12, color: C.muted }}>
+          Se elimina del catálogo y deja de aparecer en clubes y fichas. Las acciones ya anotadas en los
+          partidos <b style={{ color: C.text }}>no se tocan</b>, así que la estadística de equipo queda intacta.
+        </p>
+        <button disabled={busy} onClick={() => del('season')} className="p-2.5 rounded-md text-left"
+          style={{ background: C.panel2, border: `1px solid ${C.line}` }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>Borrar de esta temporada</div>
+          <div style={{ fontSize: 11, color: C.faint }}>Solo esta pertenencia (club + temporada actual).</div>
+        </button>
+        <button disabled={busy} onClick={() => del('all')} className="p-2.5 rounded-md text-left"
+          style={{ background: `${C.neg}14`, border: `1px solid ${C.neg}` }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: C.neg }}>Borrar definitivamente</div>
+          <div style={{ fontSize: 11, color: C.muted }}>Todas sus etapas y clubes (toda su identidad y su carrera).</div>
+        </button>
+        <button disabled={busy} onClick={onClose} className="py-2 rounded-md text-sm" style={{ color: C.muted, border: `1px solid ${C.line}` }}>
+          {busy ? 'Borrando…' : 'Cancelar'}
+        </button>
       </div>
     </div>
   );

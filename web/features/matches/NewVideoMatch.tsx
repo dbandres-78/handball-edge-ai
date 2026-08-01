@@ -14,9 +14,9 @@ import {
  * cuya plantilla escribes → al crear, el club y sus jugadores quedan guardados en el catálogo
  * (reutilizables) y el partido queda enlazado. Luego vas a la sala a cargar el vídeo y cortar.
  */
-export function NewVideoMatch() {
+export function NewVideoMatch({ defaultOpen = false }: { defaultOpen?: boolean } = {}) {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   const [season, setSeason] = useState('26/27');
   const [competition, setCompetition] = useState('');
   const [matchday, setMatchday] = useState('');

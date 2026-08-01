@@ -1,4 +1,6 @@
+'use client';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { Radio, Film, Users } from 'lucide-react';
 import { PALETTE as C, MONO } from '@/lib/theme';
 import type { MatchListItem, MatchStatus } from './types';
@@ -13,6 +15,7 @@ const STATUS: Record<MatchStatus, { label: string; color: string }> = {
 };
 
 export function MatchLibrary({ items }: { items: MatchListItem[] }) {
+  const newParam = useSearchParams().get('new');   // 'live' o 'video' desde la portada
   return (
     <div className="max-w-4xl mx-auto px-5 py-10">
       <div className="flex items-center justify-between mb-1 gap-3">
@@ -22,8 +25,8 @@ export function MatchLibrary({ items }: { items: MatchListItem[] }) {
           <Link href="/clubs" className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm" style={{ border: `1px solid ${C.line}`, color: C.text }}>
             <Users size={14} /> Clubes y fichas
           </Link>
-          <NewVideoMatch />
-          <NewLiveMatch />
+          <NewVideoMatch defaultOpen={newParam === 'video'} />
+          <NewLiveMatch defaultOpen={newParam === 'live'} />
         </div>
       </div>
       <p style={{ fontSize: 13, color: C.muted, marginBottom: 20 }}>

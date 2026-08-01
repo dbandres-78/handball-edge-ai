@@ -30,6 +30,8 @@ export interface CatalogRepository {
   listByPerson(personId: string): Promise<RosterPlayer[]>;
   /** Une la identidad del jugador `sourceId` a la de `targetId` (comparten person_id). */
   mergePersons(sourceId: string, targetId: string): Promise<void>;
+  /** Borra TODAS las pertenencias de una persona (borrado definitivo del jugador del catálogo). */
+  removePersonPlayers(personId: string): Promise<void>;
 }
 
 /** Id legible + sufijo aleatorio, mismo criterio anticolisión que newMatchId. */
@@ -125,6 +127,9 @@ export const inMemoryCatalogRepo: CatalogRepository = {
     if (!src || !tgt || src.personId === tgt.personId) return;
     const from = src.personId; const to = tgt.personId;
     for (const r of roster.values()) if (r.personId === from) roster.set(r.id, { ...r, personId: to });
+  },
+  async removePersonPlayers(personId) {
+    for (const r of [...roster.values()]) if (r.personId === personId) roster.delete(r.id);
   },
 };
 

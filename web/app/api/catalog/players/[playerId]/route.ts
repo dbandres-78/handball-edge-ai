@@ -14,8 +14,15 @@ export async function PATCH(req: Request, { params }: { params: { playerId: stri
   return NextResponse.json({ player });
 }
 
-/** DELETE — quita un jugador de la plantilla. */
-export async function DELETE(_req: Request, { params }: { params: { playerId: string } }) {
-  await (await getCatalogRepo()).removePlayer(params.playerId);
+/** DELETE — borra un jugador del catálogo. scope=all borra toda su identidad (todas sus etapas). */
+export async function DELETE(req: Request, { params }: { params: { playerId: string } }) {
+  const scope = new URL(req.url).searchParams.get('scope');
+  const catalog = await getCatalogRepo();
+  if (scope === 'all') {
+    const rp = await catalog.getPlayer(params.playerId);
+    if (rp) await catalog.removePersonPlayers(rp.personId);
+  } else {
+    await catalog.removePlayer(params.playerId);
+  }
   return NextResponse.json({ ok: true });
 }

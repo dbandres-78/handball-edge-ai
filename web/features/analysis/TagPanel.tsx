@@ -13,6 +13,7 @@ const TONE: Record<Tone, string> = { goal: C.goal, save: C.save, miss: C.miss, n
 
 interface Props {
   side: Side; setSide: (s: Side) => void;
+  autoSwitch?: boolean; setAutoSwitch?: (v: boolean) => void;
   player: number; setPlayer: (n: number) => void;
   period: number; setPeriod: (p: number) => void;
   zone: number | null; setZone: (z: number | null) => void;
@@ -85,6 +86,16 @@ export function TagPanel(p: Props) {
           </button>
         ))}
       </div>
+
+      {p.setAutoSwitch && (
+        <button onClick={() => p.setAutoSwitch!(!p.autoSwitch)} className="flex items-center justify-between -mt-1"
+          title="Al anotar un tiro o una pérdida, cambia solo al equipo rival">
+          <span style={{ fontSize: 11, color: C.muted }}>Auto-equipo al acabar la posesión</span>
+          <span className="rounded-full flex items-center px-0.5" style={{ width: 34, height: 18, background: p.autoSwitch ? C.pos : C.panel3, border: `1px solid ${p.autoSwitch ? C.pos : C.line}`, justifyContent: p.autoSwitch ? 'flex-end' : 'flex-start' }}>
+            <span className="rounded-full" style={{ width: 14, height: 14, background: p.autoSwitch ? '#0E1420' : C.muted }} />
+          </span>
+        </button>
+      )}
 
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1">

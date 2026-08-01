@@ -53,6 +53,22 @@ async function main() {
     assert.ok(all.every((r) => typeof r.clubName === 'string' && r.clubName.length > 0));
   });
 
+  await check('removePlayer borra solo esa pertenencia', async () => {
+    const inA25 = (await repo.listRoster(clubA.id, '25/26')).find((p) => p.number === 7)!;
+    const person = inA25.personId;
+    const before = (await repo.listByPerson(person)).length;   // 3 (2 en A + 1 en B)
+    await repo.removePlayer(inA25.id);
+    const after = await repo.listByPerson(person);
+    assert.equal(after.length, before - 1);
+    assert.ok(!after.some((r) => r.id === inA25.id));
+  });
+
+  await check('removePersonPlayers borra toda la identidad', async () => {
+    const any = (await repo.listRoster(clubB.id, '26/27')).find((p) => p.number === 7)!;
+    await repo.removePersonPlayers(any.personId);
+    assert.equal((await repo.listByPerson(any.personId)).length, 0);
+  });
+
   console.log(`\n${pass} passed, ${fail} failed`);
   if (fail > 0) process.exit(1);
 }

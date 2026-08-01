@@ -25,12 +25,17 @@ export async function GET(req: Request, { params }: { params: { clubId: string }
   const season = seasonQ && seasons.includes(seasonQ) ? seasonQ : seasons[0];
   const projection = season ? buildClubProjection(loaded, params.clubId, season) : null;
 
-  // Enriquece cada ficha con su identidad global (person_id) para poder abrir la carrera.
+  // Enriquece con person_id y descarta jugadores borrados del catálogo (ya no deben aparecer en la
+  // ficha, aunque sus eventos sigan en los partidos y cuenten para la estadística de equipo).
   if (projection) {
-    await Promise.all(projection.players.map(async (p) => {
+    const resolved = await Promise.all(projection.players.map(async (p) => {
       const rp = await catalog.getPlayer(p.playerId);
       if (rp) p.personId = rp.personId;
+      return { p, exists: !!rp };
     }));
+    projection.players = resolved.filter((r) => r.exists).map((r) => r.p);
+    const validIds = new Set(projection.players.map((p) => p.playerId));
+    projection.team.ranking = projection.team.ranking.filter((r) => validIds.has(r.playerId));
   }
 
   return NextResponse.json({ club, seasons, season, projection });
