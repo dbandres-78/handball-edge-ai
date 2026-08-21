@@ -67,6 +67,7 @@ CREATE TABLE IF NOT EXISTS club (
   name       text NOT NULL,
   short_name text,
   color      text,
+  photo_url  text,                        -- foto/escudo, para informes más visuales
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
@@ -80,7 +81,8 @@ CREATE TABLE IF NOT EXISTS roster_player (
   name      text NOT NULL,
   position  text,
   person_id text,                         -- identidad global de la persona (carrera entre clubes), por defecto = id
-  active    boolean NOT NULL DEFAULT true
+  active    boolean NOT NULL DEFAULT true,
+  photo_url text                          -- foto del jugador, para informes más visuales
 );
 `;
 

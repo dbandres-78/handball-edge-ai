@@ -7,9 +7,14 @@ export const dynamic = 'force-dynamic';
 export async function PATCH(req: Request, { params }: { params: { playerId: string } }) {
   const body = (await req.json().catch(() => null)) as
     { number?: number; name?: string; position?: string; active?: boolean } | null;
-  const player = await (await getCatalogRepo()).updatePlayer(params.playerId, {
-    number: body?.number, name: body?.name?.trim(), position: body?.position?.trim(), active: body?.active,
-  });
+  // Solo se incluyen las claves realmente presentes: un PATCH parcial (p.ej. solo `active`)
+  // no debe borrar el resto de campos del jugador.
+  const patch: { number?: number; name?: string; position?: string; active?: boolean } = {};
+  if (body?.number != null) patch.number = body.number;
+  if (typeof body?.name === 'string') patch.name = body.name.trim();
+  if (typeof body?.position === 'string') patch.position = body.position.trim();
+  if (typeof body?.active === 'boolean') patch.active = body.active;
+  const player = await (await getCatalogRepo()).updatePlayer(params.playerId, patch);
   if (!player) return NextResponse.json({ error: 'Jugador no encontrado' }, { status: 404 });
   return NextResponse.json({ player });
 }

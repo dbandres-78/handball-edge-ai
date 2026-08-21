@@ -39,6 +39,14 @@ const MIGRATIONS: Array<{ version: number; description: string; sql: string }> =
       UPDATE roster_player SET person_id = id WHERE person_id IS NULL;
     `,
   },
+  {
+    version: 5,
+    description: 'foto de club y de jugador (photo_url), para informes más visuales',
+    sql: `
+      ALTER TABLE club ADD COLUMN IF NOT EXISTS photo_url text;
+      ALTER TABLE roster_player ADD COLUMN IF NOT EXISTS photo_url text;
+    `,
+  },
 ];
 
 /** Aplica el esquema base + migraciones incrementales. Idempotente. */

@@ -74,7 +74,15 @@ export const inMemoryCatalogRepo: CatalogRepository = {
   async updateClub(id, patch) {
     const c = clubs.get(id);
     if (!c) return null;
-    const next: Club = { ...c, ...patch };
+    // Fusión campo a campo (no spread ciego): un patch parcial no debe borrar los campos
+    // que no vienen en él. `??` respeta explícitamente '' o false si se envían.
+    const next: Club = {
+      ...c,
+      name: patch.name ?? c.name,
+      shortName: patch.shortName ?? c.shortName,
+      color: patch.color ?? c.color,
+      photoUrl: patch.photoUrl ?? c.photoUrl,
+    };
     clubs.set(id, next);
     return next;
   },
@@ -102,7 +110,14 @@ export const inMemoryCatalogRepo: CatalogRepository = {
   async updatePlayer(id, patch) {
     const rp = roster.get(id);
     if (!rp) return null;
-    const next: RosterPlayer = { ...rp, ...patch };
+    const next: RosterPlayer = {
+      ...rp,
+      number: patch.number ?? rp.number,
+      name: patch.name ?? rp.name,
+      position: patch.position ?? rp.position,
+      active: patch.active ?? rp.active,
+      photoUrl: patch.photoUrl ?? rp.photoUrl,
+    };
     roster.set(id, next);
     return next;
   },

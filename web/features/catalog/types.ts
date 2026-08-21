@@ -19,6 +19,8 @@ export interface Club {
   name: string;
   shortName?: string;
   color?: string;
+  /** Ruta de servido de la foto/escudo (p.ej. /api/catalog/clubs/{id}/photo), no la ruta de disco. */
+  photoUrl?: string;
 }
 
 /** Pertenencia de un jugador a un club en una temporada, con su dorsal de esa temporada. */
@@ -31,6 +33,8 @@ export interface RosterPlayer {
   position?: string;
   personId: string;   // identidad global (carrera entre clubes); por defecto = id hasta que se vincula
   active: boolean;
+  /** Ruta de servido de la foto (p.ej. /api/catalog/players/{id}/photo), no la ruta de disco. */
+  photoUrl?: string;
 }
 
 /** Jugador de plantilla con el nombre de su club, para listados/selectores de vinculación. */
@@ -42,6 +46,7 @@ export interface NewClubInput {
   name: string;
   shortName?: string;
   color?: string;
+  photoUrl?: string;
 }
 
 export interface NewRosterPlayerInput {
@@ -58,4 +63,5 @@ export interface RosterPlayerPatch {
   name?: string;
   position?: string;
   active?: boolean;
+  photoUrl?: string;
 }

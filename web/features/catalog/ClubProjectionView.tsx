@@ -5,9 +5,11 @@ import { ArrowLeft, ChevronDown, ChevronRight, Loader2, User, Link2, X, Check, T
 import { PALETTE as C, MONO } from '@/lib/theme';
 import type { ClubProjection, PlayerCard } from './projection';
 import type { RosterPlayerRef } from './types';
+import { ClubRosterManager } from './ClubRosterManager';
+import { PhotoUploader } from './PhotoUploader';
 
 interface Payload {
-  club: { id: string; name: string };
+  club: { id: string; name: string; photoUrl?: string };
   seasons: string[];
   season: string | null;
   projection: ClubProjection | null;
@@ -21,6 +23,8 @@ export function ClubProjectionView({ clubId }: { clubId: string }) {
   const [season, setSeason] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [reloadKey, setReloadKey] = useState(0);
+  const [tab, setTab] = useState<'fichas' | 'plantilla'>('fichas');
+  const [tabDefaulted, setTabDefaulted] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -28,7 +32,14 @@ export function ClubProjectionView({ clubId }: { clubId: string }) {
     const q = season ? `?season=${encodeURIComponent(season)}` : '';
     fetch(`/api/catalog/clubs/${clubId}/projection${q}`)
       .then((r) => r.json())
-      .then((d: Payload) => { if (alive) { setData(d); setSeason(d.season); } })
+      .then((d: Payload) => {
+        if (!alive) return;
+        setData(d);
+        setSeason(d.season);
+        // Un club recién creado, sin partidos aún, se abre directamente en "Plantilla":
+        // la pestaña "Fichas" estaría vacía y no sirve para nada en ese momento.
+        if (!tabDefaulted) { setTabDefaulted(true); if (!d.projection || d.projection.games === 0) setTab('plantilla'); }
+      })
       .finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -43,8 +54,15 @@ export function ClubProjectionView({ clubId }: { clubId: string }) {
       </Link>
 
       <div className="flex items-center justify-between flex-wrap gap-3 mb-1">
-        <h1 style={{ fontSize: 22, fontWeight: 700, color: C.text }}>{data?.club.name ?? 'Club'}</h1>
-        {data && data.seasons.length > 0 && (
+        <div className="flex items-center gap-3">
+          {data && (
+            <PhotoUploader src={data.club.photoUrl} uploadUrl={`/api/catalog/clubs/${clubId}/photo`} size={44}
+              onUploaded={(photoUrl) => setData((d) => (d ? { ...d, club: { ...d.club, photoUrl } } : d))}
+              onRemoved={() => setData((d) => (d ? { ...d, club: { ...d.club, photoUrl: undefined } } : d))} />
+          )}
+          <h1 style={{ fontSize: 22, fontWeight: 700, color: C.text }}>{data?.club.name ?? 'Club'}</h1>
+        </div>
+        {tab === 'fichas' && data && data.seasons.length > 0 && (
           <div className="flex items-center gap-1">
             {data.seasons.map((s) => {
               const on = s === season;
@@ -59,11 +77,19 @@ export function ClubProjectionView({ clubId }: { clubId: string }) {
         )}
       </div>
 
-      {loading ? (
+      <div className="flex items-center gap-1.5 mt-3">
+        <TabButton active={tab === 'fichas'} onClick={() => setTab('fichas')}>Fichas</TabButton>
+        <TabButton active={tab === 'plantilla'} onClick={() => setTab('plantilla')}>Plantilla</TabButton>
+      </div>
+
+      {tab === 'plantilla' ? (
+        <ClubRosterManager clubId={clubId} />
+      ) : loading ? (
         <div className="flex items-center gap-2 py-12" style={{ color: C.faint }}><Loader2 size={16} className="animate-spin" /> Cargando fichas…</div>
       ) : !proj || proj.games === 0 ? (
         <div className="text-center py-12 rounded-lg mt-4" style={{ color: C.faint, fontSize: 13, border: `1px dashed ${C.line}` }}>
-          Este club aún no tiene partidos enlazados en esta temporada. Da de alta partidos con su plantilla para ver las fichas.
+          Este club aún no tiene partidos enlazados en esta temporada. Da de alta partidos con su plantilla para ver las fichas,
+          o pásate a la pestaña "Plantilla" para preparar el equipo con antelación.
         </div>
       ) : (
         <>
@@ -75,6 +101,15 @@ export function ClubProjectionView({ clubId }: { clubId: string }) {
         </>
       )}
     </div>
+  );
+}
+
+function TabButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button onClick={onClick} className="px-3 py-1.5 rounded-md text-sm"
+      style={{ background: active ? C.panel3 : 'transparent', color: active ? C.text : C.muted, fontWeight: active ? 700 : 500, border: `1px solid ${active ? C.line : 'transparent'}` }}>
+      {children}
+    </button>
   );
 }
 
@@ -124,6 +159,12 @@ function PlayerRow({ pl, onChanged }: { pl: PlayerCard; onChanged: () => void })
     <div className="rounded-md" style={{ background: C.panel, border: `1px solid ${C.line}` }}>
       <button onClick={() => setOpen(!open)} className="w-full flex items-center gap-3 p-2.5 text-left">
         {open ? <ChevronDown size={15} color={C.faint} /> : <ChevronRight size={15} color={C.faint} />}
+        {pl.photoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={pl.photoUrl} alt={pl.name} className="w-7 h-7 rounded-full object-cover flex-shrink-0" style={{ border: `1px solid ${C.line}` }} />
+        ) : (
+          <span className="w-7 h-7 rounded-full flex-shrink-0" style={{ background: C.panel2, border: `1px solid ${C.line}` }} />
+        )}
         <span style={{ fontFamily: MONO, fontSize: 13, color: C.text, width: 34 }}>#{pl.number}</span>
         <span className="flex-1 truncate" style={{ fontSize: 14, color: C.text }}>{pl.name}</span>
         <span style={{ fontSize: 11, color: C.faint }}>{pl.games} pt</span>

@@ -3,10 +3,11 @@ import { useState } from 'react';
 import { Shield, Pencil, X, Plus, ArrowLeftRight, BookMarked, Check, Loader2 } from 'lucide-react';
 import { PALETTE as C, MONO } from '@/lib/theme';
 import { fmt } from '@/lib/handball/format';
-import { ACTIONS, ActionDef, Tone } from '@/lib/handball/actions';
-import { UiTeam, Side, ShotOrigin, UiEvent, onCourtAt, AttackPhase, EventType } from '@/lib/handball/mapping';
+import { ACTIONS, ActionDef, Tone, isTerminalAction } from '@/lib/handball/actions';
+import { UiTeam, Side, ShotOrigin, UiEvent, onCourtAt, AttackPhase, EventType, TacticalContext } from '@/lib/handball/mapping';
 import { GoalTarget } from './GoalTarget';
 import { ShotOriginCourt, ORIGIN_LABEL } from './ShotOriginCourt';
+import { TacticalContextModal } from './TacticalContextModal';
 import { saveToCatalog } from './actions';
 
 const TONE: Record<Tone, string> = { goal: C.goal, save: C.save, miss: C.miss, neg: C.neg, pos: C.pos, warn: C.warn, neutral: C.neutral };
@@ -25,7 +26,12 @@ interface Props {
   home: UiTeam; away: UiTeam;
   setHome: (t: UiTeam) => void; setAway: (t: UiTeam) => void;
   editRoster: boolean; setEditRoster: (v: boolean) => void;
-  tag: (a: ActionDef) => void; time: number;
+  /**
+   * Cierra la jugada. En tiro/pérdida, `tacticalContext` es la combinación previa clasificada en
+   * el paso opcional (permuta/cruce/desdoblamiento/cortina); `null` = se saltó ese paso.
+   */
+  tag: (a: ActionDef, tacticalContext?: TacticalContext | null) => void;
+  time: number;
   /** Portero actualmente en pista del equipo seleccionado (dorsal). */
   activeGk?: number | null;
   /** Callback al cambiar de portero en pista. */
@@ -39,6 +45,12 @@ interface Props {
   season?: string;
   /** Al enlazar el partido al catálogo, la sala actualiza ambos equipos con los enlaces. */
   onLinkedToCatalog?: (home: UiTeam, away: UiTeam) => void;
+  /**
+   * 'stack' (por defecto): columna única vertical, la de siempre — la usa la sala de vídeo en su
+   * panel lateral estrecho. 'wide': rejilla de 3 columnas (jugadores · lanzamiento/portería ·
+   * acciones) para la sala en DIRECTO, donde hay toda la pantalla disponible.
+   */
+  layout?: 'stack' | 'wide';
 }
 
 /** Máximo jugadores por equipo (RFEBM). */
@@ -49,11 +61,13 @@ const MAX_DORSAL = 100;
 
 export function TagPanel(p: Props) {
   const [subOut, setSubOut] = useState<number | null>(null);
+  const [pendingAction, setPendingAction] = useState<ActionDef | null>(null);
   const team = p.side === 'HOME' ? p.home : p.away;
   const setTeam = p.side === 'HOME' ? p.setHome : p.setAway;
   const accent = p.side === 'HOME' ? C.home : C.away;
   const rival = p.side === 'HOME' ? p.away : p.home;
   const rivalAccent = p.side === 'HOME' ? C.away : C.home;
+  const wide = p.layout === 'wide';
 
   const updatePlayer = (i: number, patch: Partial<UiTeam['players'][number]>) => {
     // gk es ahora "es portero" (puede haber varios), no exclusivo. No limpiamos gk de los demás.
@@ -70,197 +84,240 @@ export function TagPanel(p: Props) {
   const currentGk = p.activeGk ?? goalkeepers[0]?.number;
   const startersCount = team.players.filter((pl) => pl.starter).length;
 
-  // En pista / banquillo en el instante actual (para el panel de cambios).
+  // En pista / banquillo en el instante actual (para el panel de cambios y para agrupar el
+  // selector de jugador: ver quién está en pista de un vistazo es parte de lo que se pide en
+  // "que los jugadores de campo y banquillo se vean mejor").
   const lineupDefined = startersCount > 0;
   const onCourt = onCourtAt(team, p.events ?? [], p.side, p.time);
   const benchPlayers = team.players.filter((pl) => !onCourt.has(pl.number));
   const courtPlayers = team.players.filter((pl) => onCourt.has(pl.number));
+  // Para el selector "quién hizo la acción": si hay alineación, separa en pista/banquillo;
+  // si no hay alineación definida, onCourtAt mete a todos dentro y no hay nada que separar.
+  const showSplit = lineupDefined && benchPlayers.length > 0;
 
-  return (
-    <div className="p-3 flex flex-col gap-3">
-      <div className="flex rounded-md overflow-hidden" style={{ border: `1px solid ${C.line}` }}>
-        {(['HOME', 'AWAY'] as Side[]).map((s) => (
-          <button key={s} onClick={() => p.setSide(s)} className="flex-1 py-2 text-sm truncate px-2"
-            style={{ background: p.side === s ? (s === 'HOME' ? C.home : C.away) : 'transparent', color: p.side === s ? '#0E1420' : C.muted, fontWeight: 600 }}>
-            {(s === 'HOME' ? p.home : p.away).name}
+  /** Botón de acción: tiro/pérdida abren el paso opcional de clasificación táctica antes de
+   * cerrar la jugada; el resto (falta, exclusión, tarjetas, cambio de portero…) se anota directo,
+   * como siempre, para no restarles agilidad. */
+  const handleAction = (a: ActionDef) => {
+    if (isTerminalAction(a)) { setPendingAction(a); return; }
+    p.tag(a);
+  };
+
+  const playerButton = (pl: UiTeam['players'][number], opts?: { dim?: boolean }) => (
+    <button key={pl.number} onClick={() => p.setPlayer(pl.number)}
+      className="relative py-2 rounded-md flex flex-col items-center"
+      style={{
+        background: p.player === pl.number ? accent : C.panel2,
+        border: `1px solid ${p.player === pl.number ? accent : C.line}`,
+        color: p.player === pl.number ? '#0E1420' : C.text,
+        opacity: opts?.dim && p.player !== pl.number ? 0.55 : 1,
+      }}>
+      {pl.gk && <Shield size={10} className="absolute top-1 right-1" color={p.player === pl.number ? '#0E1420' : C.amber} />}
+      <span style={{ fontFamily: MONO, fontSize: wide ? 22 : 18, fontWeight: 700 }}>{pl.number}</span>
+      <span className="truncate" style={{ fontSize: wide ? 10 : 9, opacity: 0.8, maxWidth: wide ? 84 : 60 }}>{pl.name}</span>
+    </button>
+  );
+
+  // ── Bloque: cambio HOME/AWAY ──────────────────────────────────────────────
+  const teamSwitchBlock = (
+    <div className="flex rounded-md overflow-hidden" style={{ border: `1px solid ${C.line}` }}>
+      {(['HOME', 'AWAY'] as Side[]).map((s) => (
+        <button key={s} onClick={() => p.setSide(s)} className="flex-1 py-2 text-sm truncate px-2"
+          style={{ background: p.side === s ? (s === 'HOME' ? C.home : C.away) : 'transparent', color: p.side === s ? '#0E1420' : C.muted, fontWeight: 600 }}>
+          {(s === 'HOME' ? p.home : p.away).name}
+        </button>
+      ))}
+    </div>
+  );
+
+  const autoSwitchBlock = p.setAutoSwitch && (
+    <button onClick={() => p.setAutoSwitch!(!p.autoSwitch)} className="flex items-center justify-between -mt-1"
+      title="Al anotar un tiro o una pérdida, cambia solo al equipo rival">
+      <span style={{ fontSize: 11, color: C.muted }}>Auto-equipo al acabar la posesión</span>
+      <span className="rounded-full flex items-center px-0.5" style={{ width: 34, height: 18, background: p.autoSwitch ? C.pos : C.panel3, border: `1px solid ${p.autoSwitch ? C.pos : C.line}`, justifyContent: p.autoSwitch ? 'flex-end' : 'flex-start' }}>
+        <span className="rounded-full" style={{ width: 14, height: 14, background: p.autoSwitch ? '#0E1420' : C.muted }} />
+      </span>
+    </button>
+  );
+
+  const periodRosterHeaderBlock = (
+    <div className="flex items-center justify-between">
+      <div className="flex items-center gap-1">
+        <span style={{ fontSize: 11, color: C.faint, marginRight: 4 }}>PARTE</span>
+        {[1, 2, 3, 4].map((n) => (
+          <button key={n} onClick={() => p.setPeriod(n)} className="w-7 h-7 rounded-md text-sm"
+            style={{ fontFamily: MONO, background: p.period === n ? C.panel3 : C.panel, color: p.period === n ? C.text : C.muted, border: `1px solid ${C.line}` }}>{n}</button>
+        ))}
+      </div>
+      <button onClick={() => p.setEditRoster(!p.editRoster)} className="flex items-center gap-1 text-xs px-2 py-1 rounded-md" style={{ color: p.editRoster ? C.amber : C.muted, border: `1px solid ${C.line}` }}>
+        <Pencil size={12} /> Plantillas
+      </button>
+    </div>
+  );
+
+  // ── Bloque: editor de plantilla O selector de jugador (con En campo/Banquillo) ───────────────
+  const rosterEditorBlock = (
+    <div className="flex flex-col gap-1.5">
+      <input value={team.name} onChange={(e) => setTeam({ ...team, name: e.target.value })} className="px-2 py-1.5 rounded-md text-sm w-full" style={{ background: C.bg, border: `1px solid ${C.line}`, color: C.text }} />
+      {team.players.map((pl, i) => (
+        <div key={i} className="flex items-center gap-1.5">
+          <input value={pl.number} onChange={(e) => updatePlayer(i, { number: clampDorsal(Number(e.target.value) || MIN_DORSAL) })} className="w-12 px-1.5 py-1 rounded-md text-sm text-center" style={{ fontFamily: MONO, background: C.bg, border: `1px solid ${C.line}`, color: C.text }} />
+          <input value={pl.name} onChange={(e) => updatePlayer(i, { name: e.target.value })} className="flex-1 px-2 py-1 rounded-md text-sm" style={{ background: C.bg, border: `1px solid ${C.line}`, color: C.text }} />
+          <button onClick={() => updatePlayer(i, { starter: !pl.starter })} title="Titular (en pista al inicio)" className="w-7 h-7 rounded-md flex items-center justify-center" style={{ fontFamily: MONO, fontSize: 11, fontWeight: 700, background: pl.starter ? C.goal : C.panel, color: pl.starter ? '#0E1420' : C.muted, border: `1px solid ${C.line}` }}>T</button>
+          <button onClick={() => updatePlayer(i, { gk: !pl.gk })} title="Portero" className="w-7 h-7 rounded-md flex items-center justify-center" style={{ background: pl.gk ? accent : C.panel, color: pl.gk ? '#0E1420' : C.muted, border: `1px solid ${C.line}` }}><Shield size={13} /></button>
+          <button onClick={() => rmPlayer(i)} className="w-7 h-7 rounded-md flex items-center justify-center" style={{ color: C.faint, border: `1px solid ${C.line}` }}><X size={13} /></button>
+        </div>
+      ))}
+      <div className="flex items-center justify-between">
+        <button onClick={addPlayer} disabled={team.players.length >= MAX_PLAYERS}
+          className="flex items-center justify-center gap-1 py-1.5 px-3 rounded-md text-sm"
+          style={{ color: team.players.length >= MAX_PLAYERS ? C.faint : C.muted, border: `1px dashed ${C.line}`, opacity: team.players.length >= MAX_PLAYERS ? 0.5 : 1 }}>
+          <Plus size={13} /> Añadir jugador
+        </button>
+        <span style={{ fontSize: 10, color: startersCount > 0 ? (startersCount === 7 ? C.goal : C.amber) : C.faint }}>
+          {startersCount > 0 ? `${startersCount}/7 titulares` : 'sin alineación'} · {team.players.length}/{MAX_PLAYERS}
+        </span>
+      </div>
+      <div style={{ fontSize: 10, color: C.faint }}>
+        Marca con <span style={{ color: C.goal, fontWeight: 700 }}>T</span> los 7 titulares (6 de campo + portero).
+        Define quién está en pista al inicio: es la base del diferencial ± fino. Sin titulares marcados, el ±
+        cae al diferencial de equipo.
+      </div>
+      {p.matchId && (
+        <SaveToCatalog matchId={p.matchId} defaultSeason={p.season} onLinked={p.onLinkedToCatalog} />
+      )}
+    </div>
+  );
+
+  const playerGridBlock = showSplit ? (
+    <div className="flex flex-col gap-2.5">
+      <div>
+        <div style={{ fontSize: 10, letterSpacing: 1, color: C.faint, marginBottom: 4 }}>EN CAMPO · {courtPlayers.length}</div>
+        <div className="grid gap-1.5" style={{ gridTemplateColumns: wide ? 'repeat(4, minmax(0,1fr))' : 'repeat(4, minmax(0,1fr))' }}>
+          {courtPlayers.map((pl) => playerButton(pl))}
+        </div>
+      </div>
+      <div>
+        <div style={{ fontSize: 10, letterSpacing: 1, color: C.faint, marginBottom: 4 }}>BANQUILLO · {benchPlayers.length}</div>
+        <div className="grid gap-1.5" style={{ gridTemplateColumns: 'repeat(4, minmax(0,1fr))' }}>
+          {benchPlayers.map((pl) => playerButton(pl, { dim: true }))}
+        </div>
+      </div>
+    </div>
+  ) : (
+    <div className="grid grid-cols-4 gap-1.5">
+      {team.players.map((pl) => playerButton(pl))}
+    </div>
+  );
+
+  const goalkeeperBlock = goalkeepers.length >= 2 && (
+    <div className="p-2.5 rounded-md" style={{ background: C.panel2, border: `1px solid ${C.line}` }}>
+      <div className="flex items-center justify-between mb-1.5">
+        <span style={{ fontSize: 11, color: C.text, fontWeight: 600 }}>Portero en pista</span>
+        <span style={{ fontFamily: MONO, fontSize: 10, color: C.faint }}>{team.name}</span>
+      </div>
+      <div className="flex gap-1.5">
+        {goalkeepers.map((gk) => (
+          <button key={gk.number} onClick={() => p.onGkChange?.(p.side, gk.number)}
+            className="flex-1 py-2 rounded-md flex flex-col items-center gap-0.5"
+            style={{
+              background: currentGk === gk.number ? accent : C.panel,
+              color: currentGk === gk.number ? '#0E1420' : C.muted,
+              border: `1px solid ${currentGk === gk.number ? accent : C.line}`,
+              fontWeight: currentGk === gk.number ? 700 : 500,
+            }}>
+            <Shield size={14} />
+            <span style={{ fontFamily: MONO, fontSize: 16, fontWeight: 700 }}>{gk.number}</span>
+            <span className="truncate" style={{ fontSize: 9, maxWidth: 70 }}>{gk.name}</span>
           </button>
         ))}
       </div>
+    </div>
+  );
 
-      {p.setAutoSwitch && (
-        <button onClick={() => p.setAutoSwitch!(!p.autoSwitch)} className="flex items-center justify-between -mt-1"
-          title="Al anotar un tiro o una pérdida, cambia solo al equipo rival">
-          <span style={{ fontSize: 11, color: C.muted }}>Auto-equipo al acabar la posesión</span>
-          <span className="rounded-full flex items-center px-0.5" style={{ width: 34, height: 18, background: p.autoSwitch ? C.pos : C.panel3, border: `1px solid ${p.autoSwitch ? C.pos : C.line}`, justifyContent: p.autoSwitch ? 'flex-end' : 'flex-start' }}>
-            <span className="rounded-full" style={{ width: 14, height: 14, background: p.autoSwitch ? '#0E1420' : C.muted }} />
-          </span>
-        </button>
-      )}
-
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-1">
-          <span style={{ fontSize: 11, color: C.faint, marginRight: 4 }}>PARTE</span>
-          {[1, 2, 3, 4].map((n) => (
-            <button key={n} onClick={() => p.setPeriod(n)} className="w-7 h-7 rounded-md text-sm"
-              style={{ fontFamily: MONO, background: p.period === n ? C.panel3 : C.panel, color: p.period === n ? C.text : C.muted, border: `1px solid ${C.line}` }}>{n}</button>
-          ))}
-        </div>
-        <button onClick={() => p.setEditRoster(!p.editRoster)} className="flex items-center gap-1 text-xs px-2 py-1 rounded-md" style={{ color: p.editRoster ? C.amber : C.muted, border: `1px solid ${C.line}` }}>
-          <Pencil size={12} /> Plantillas
-        </button>
+  const substitutionBlock = p.recordSub && (
+    <div className="p-2.5 rounded-md" style={{ background: C.panel2, border: `1px solid ${C.line}` }}>
+      <div className="flex items-center justify-between mb-1.5">
+        <span className="flex items-center gap-1" style={{ fontSize: 11, color: C.text, fontWeight: 600 }}>
+          <ArrowLeftRight size={12} /> En pista · cambios
+        </span>
+        <span style={{ fontFamily: MONO, fontSize: 10, color: lineupDefined ? (onCourt.size === 7 ? C.goal : C.amber) : C.faint }}>
+          {lineupDefined ? `${onCourt.size} en pista` : 'sin alineación'}
+        </span>
       </div>
 
-      {p.editRoster ? (
-        <div className="flex flex-col gap-1.5">
-          <input value={team.name} onChange={(e) => setTeam({ ...team, name: e.target.value })} className="px-2 py-1.5 rounded-md text-sm w-full" style={{ background: C.bg, border: `1px solid ${C.line}`, color: C.text }} />
-          {team.players.map((pl, i) => (
-            <div key={i} className="flex items-center gap-1.5">
-              <input value={pl.number} onChange={(e) => updatePlayer(i, { number: clampDorsal(Number(e.target.value) || MIN_DORSAL) })} className="w-12 px-1.5 py-1 rounded-md text-sm text-center" style={{ fontFamily: MONO, background: C.bg, border: `1px solid ${C.line}`, color: C.text }} />
-              <input value={pl.name} onChange={(e) => updatePlayer(i, { name: e.target.value })} className="flex-1 px-2 py-1 rounded-md text-sm" style={{ background: C.bg, border: `1px solid ${C.line}`, color: C.text }} />
-              <button onClick={() => updatePlayer(i, { starter: !pl.starter })} title="Titular (en pista al inicio)" className="w-7 h-7 rounded-md flex items-center justify-center" style={{ fontFamily: MONO, fontSize: 11, fontWeight: 700, background: pl.starter ? C.goal : C.panel, color: pl.starter ? '#0E1420' : C.muted, border: `1px solid ${C.line}` }}>T</button>
-              <button onClick={() => updatePlayer(i, { gk: !pl.gk })} title="Portero" className="w-7 h-7 rounded-md flex items-center justify-center" style={{ background: pl.gk ? accent : C.panel, color: pl.gk ? '#0E1420' : C.muted, border: `1px solid ${C.line}` }}><Shield size={13} /></button>
-              <button onClick={() => rmPlayer(i)} className="w-7 h-7 rounded-md flex items-center justify-center" style={{ color: C.faint, border: `1px solid ${C.line}` }}><X size={13} /></button>
-            </div>
-          ))}
-          <div className="flex items-center justify-between">
-            <button onClick={addPlayer} disabled={team.players.length >= MAX_PLAYERS}
-              className="flex items-center justify-center gap-1 py-1.5 px-3 rounded-md text-sm"
-              style={{ color: team.players.length >= MAX_PLAYERS ? C.faint : C.muted, border: `1px dashed ${C.line}`, opacity: team.players.length >= MAX_PLAYERS ? 0.5 : 1 }}>
-              <Plus size={13} /> Añadir jugador
-            </button>
-            <span style={{ fontSize: 10, color: startersCount > 0 ? (startersCount === 7 ? C.goal : C.amber) : C.faint }}>
-              {startersCount > 0 ? `${startersCount}/7 titulares` : 'sin alineación'} · {team.players.length}/{MAX_PLAYERS}
-            </span>
-          </div>
-          <div style={{ fontSize: 10, color: C.faint }}>
-            Marca con <span style={{ color: C.goal, fontWeight: 700 }}>T</span> los 7 titulares (6 de campo + portero).
-            Define quién está en pista al inicio: es la base del diferencial ± fino. Sin titulares marcados, el ±
-            cae al diferencial de equipo.
-          </div>
-          {p.matchId && (
-            <SaveToCatalog matchId={p.matchId} defaultSeason={p.season} onLinked={p.onLinkedToCatalog} />
-          )}
+      {!lineupDefined ? (
+        <div style={{ fontSize: 10, color: C.faint }}>
+          Marca los 7 titulares en <span style={{ color: C.amber }}>Plantillas</span> para registrar cambios
+          y afinar el ±. Sin alineación, el ± refleja el diferencial de equipo.
         </div>
       ) : (
-        <div className="grid grid-cols-4 gap-1.5">
-          {team.players.map((pl) => (
-            <button key={pl.number} onClick={() => p.setPlayer(pl.number)} className="relative py-2 rounded-md flex flex-col items-center"
-              style={{ background: p.player === pl.number ? accent : C.panel2, border: `1px solid ${p.player === pl.number ? accent : C.line}`, color: p.player === pl.number ? '#0E1420' : C.text }}>
-              {pl.gk && <Shield size={10} className="absolute top-1 right-1" color={p.player === pl.number ? '#0E1420' : C.amber} />}
-              <span style={{ fontFamily: MONO, fontSize: 18, fontWeight: 700 }}>{pl.number}</span>
-              <span className="truncate" style={{ fontSize: 9, opacity: 0.8, maxWidth: 60 }}>{pl.name}</span>
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* Portero en pista: solo visible si hay ≥2 porteros en la plantilla */}
-      {goalkeepers.length >= 2 && (
-        <div className="p-2.5 rounded-md" style={{ background: C.panel2, border: `1px solid ${C.line}` }}>
-          <div className="flex items-center justify-between mb-1.5">
-            <span style={{ fontSize: 11, color: C.text, fontWeight: 600 }}>Portero en pista</span>
-            <span style={{ fontFamily: MONO, fontSize: 10, color: C.faint }}>{team.name}</span>
+        <>
+          <div style={{ fontSize: 9, color: C.faint, marginBottom: 3 }}>
+            {subOut == null ? 'Toca quién SALE' : `Sale #${subOut} — ahora toca quién ENTRA`}
           </div>
-          <div className="flex gap-1.5">
-            {goalkeepers.map((gk) => (
-              <button key={gk.number} onClick={() => p.onGkChange?.(p.side, gk.number)}
-                className="flex-1 py-2 rounded-md flex flex-col items-center gap-0.5"
-                style={{
-                  background: currentGk === gk.number ? accent : C.panel,
-                  color: currentGk === gk.number ? '#0E1420' : C.muted,
-                  border: `1px solid ${currentGk === gk.number ? accent : C.line}`,
-                  fontWeight: currentGk === gk.number ? 700 : 500,
-                }}>
-                <Shield size={14} />
-                <span style={{ fontFamily: MONO, fontSize: 16, fontWeight: 700 }}>{gk.number}</span>
-                <span className="truncate" style={{ fontSize: 9, maxWidth: 70 }}>{gk.name}</span>
+          <div className="flex flex-wrap gap-1 mb-2">
+            {courtPlayers.map((pl) => (
+              <button key={pl.number} onClick={() => setSubOut(subOut === pl.number ? null : pl.number)}
+                className="w-8 h-7 rounded-md flex items-center justify-center"
+                style={{ fontFamily: MONO, fontSize: 12, fontWeight: 700,
+                  background: subOut === pl.number ? C.neg : C.panel,
+                  color: subOut === pl.number ? '#0E1420' : C.text,
+                  border: `1px solid ${subOut === pl.number ? C.neg : C.line}` }}>
+                {pl.gk && <Shield size={9} style={{ marginRight: 1 }} />}{pl.number}
               </button>
             ))}
           </div>
-        </div>
-      )}
-
-      {/* En pista / cambios de jugador de campo: base del ± fino */}
-      {p.recordSub && (
-        <div className="p-2.5 rounded-md" style={{ background: C.panel2, border: `1px solid ${C.line}` }}>
-          <div className="flex items-center justify-between mb-1.5">
-            <span className="flex items-center gap-1" style={{ fontSize: 11, color: C.text, fontWeight: 600 }}>
-              <ArrowLeftRight size={12} /> En pista · cambios
-            </span>
-            <span style={{ fontFamily: MONO, fontSize: 10, color: lineupDefined ? (onCourt.size === 7 ? C.goal : C.amber) : C.faint }}>
-              {lineupDefined ? `${onCourt.size} en pista` : 'sin alineación'}
-            </span>
+          <div className="flex items-center justify-between mb-1" style={{ fontSize: 9, color: C.faint }}>
+            <span>Banquillo</span>
+            <span style={{ fontFamily: MONO }}>{fmt(p.time)}</span>
           </div>
-
-          {!lineupDefined ? (
-            <div style={{ fontSize: 10, color: C.faint }}>
-              Marca los 7 titulares en <span style={{ color: C.amber }}>Plantillas</span> para registrar cambios
-              y afinar el ±. Sin alineación, el ± refleja el diferencial de equipo.
-            </div>
-          ) : (
-            <>
-              <div style={{ fontSize: 9, color: C.faint, marginBottom: 3 }}>
-                {subOut == null ? 'Toca quién SALE' : `Sale #${subOut} — ahora toca quién ENTRA`}
-              </div>
-              <div className="flex flex-wrap gap-1 mb-2">
-                {courtPlayers.map((pl) => (
-                  <button key={pl.number} onClick={() => setSubOut(subOut === pl.number ? null : pl.number)}
-                    className="w-8 h-7 rounded-md flex items-center justify-center"
-                    style={{ fontFamily: MONO, fontSize: 12, fontWeight: 700,
-                      background: subOut === pl.number ? C.neg : C.panel,
-                      color: subOut === pl.number ? '#0E1420' : C.text,
-                      border: `1px solid ${subOut === pl.number ? C.neg : C.line}` }}>
-                    {pl.gk && <Shield size={9} style={{ marginRight: 1 }} />}{pl.number}
-                  </button>
-                ))}
-              </div>
-              <div className="flex items-center justify-between mb-1" style={{ fontSize: 9, color: C.faint }}>
-                <span>Banquillo</span>
-                <span style={{ fontFamily: MONO }}>{fmt(p.time)}</span>
-              </div>
-              <div className="flex flex-wrap gap-1">
-                {benchPlayers.length === 0 && <span style={{ fontSize: 10, color: C.faint }}>Nadie en el banquillo</span>}
-                {benchPlayers.map((pl) => (
-                  <button key={pl.number} disabled={subOut == null}
-                    onClick={() => { if (subOut != null) { p.recordSub!(p.side, subOut, pl.number); setSubOut(null); } }}
-                    className="w-8 h-7 rounded-md flex items-center justify-center"
-                    style={{ fontFamily: MONO, fontSize: 12, fontWeight: 700,
-                      background: C.panel, color: subOut == null ? C.faint : C.pos,
-                      border: `1px solid ${C.line}`, opacity: subOut == null ? 0.5 : 1 }}>
-                    {pl.gk && <Shield size={9} style={{ marginRight: 1 }} />}{pl.number}
-                  </button>
-                ))}
-              </div>
-            </>
-          )}
-        </div>
+          <div className="flex flex-wrap gap-1">
+            {benchPlayers.length === 0 && <span style={{ fontSize: 10, color: C.faint }}>Nadie en el banquillo</span>}
+            {benchPlayers.map((pl) => (
+              <button key={pl.number} disabled={subOut == null}
+                onClick={() => { if (subOut != null) { p.recordSub!(p.side, subOut, pl.number); setSubOut(null); } }}
+                className="w-8 h-7 rounded-md flex items-center justify-center"
+                style={{ fontFamily: MONO, fontSize: 12, fontWeight: 700,
+                  background: C.panel, color: subOut == null ? C.faint : C.pos,
+                  border: `1px solid ${C.line}`, opacity: subOut == null ? 0.5 : 1 }}>
+                {pl.gk && <Shield size={9} style={{ marginRight: 1 }} />}{pl.number}
+              </button>
+            ))}
+          </div>
+        </>
       )}
+    </div>
+  );
 
-      {/* Desde dónde se lanza (xG) */}
+  // ── Bloque: dónde lanza / a dónde va (protagonismo grande en layout "wide") ──────────────────
+  const shotOriginWidth = wide ? 420 : 300;
+  const goalTargetSize = wide ? 220 : 150;
+
+  const shotEntryBlock = (
+    <>
       <div className="p-2.5 rounded-md" style={{ background: C.panel2, border: `1px solid ${C.line}` }}>
         <div className="flex items-center justify-between mb-1">
-          <span style={{ fontSize: 11, color: C.text, fontWeight: 600 }}>Desde dónde lanza</span>
+          <span style={{ fontSize: wide ? 13 : 11, color: C.text, fontWeight: 600 }}>Desde dónde lanza</span>
           <span style={{ fontFamily: MONO, fontSize: 10, color: p.origin ? accent : C.faint }}>
             {p.origin ? ORIGIN_LABEL[p.origin] : 'sin zona'}
           </span>
         </div>
         <div className="flex justify-center">
-          <ShotOriginCourt mode="input" value={p.origin} onPick={p.setOrigin} accent={accent} width={300} />
+          <ShotOriginCourt mode="input" value={p.origin} onPick={p.setOrigin} accent={accent} width={shotOriginWidth} />
         </div>
       </div>
 
-      {/* A dónde va el balón (xGOT) */}
-      <div className="flex items-center gap-3 p-2.5 rounded-md" style={{ background: C.panel2, border: `1px solid ${C.line}` }}>
-        <GoalTarget mode="input" value={p.zone} onPick={p.setZone} accent={accent} size={150} />
+      <div className={wide ? 'flex items-center gap-4 p-3 rounded-md justify-center' : 'flex items-center gap-3 p-2.5 rounded-md'} style={{ background: C.panel2, border: `1px solid ${C.line}` }}>
+        <GoalTarget mode="input" value={p.zone} onPick={p.setZone} accent={accent} size={goalTargetSize} />
         <div className="text-xs" style={{ color: C.muted }}>
-          <div style={{ color: C.text, fontWeight: 600, marginBottom: 2 }}>A dónde va</div>
+          <div style={{ color: C.text, fontWeight: 600, marginBottom: 2, fontSize: wide ? 13 : 12 }}>A dónde va</div>
           {p.zone
             ? <span style={{ fontFamily: MONO, color: accent }}>Zona {p.zone} de portería</span>
             : 'Colocación del tiro en la portería'}
         </div>
       </div>
 
-      {/* Penalti (7m): xG fijo, fuera del juego abierto. No usa zona de pista. */}
       <button onClick={() => p.setIsPenalty(!p.isPenalty)}
         className="flex items-center justify-between p-2.5 rounded-md w-full"
         style={{
@@ -279,7 +336,6 @@ export function TagPanel(p: Props) {
         </span>
       </button>
 
-      {/* Autor del blocaje: sin él, «Blocado» no puntúa a ningún defensor. */}
       <div className="p-2.5 rounded-md" style={{ background: C.panel2, border: `1px solid ${C.line}` }}>
         <div className="flex items-center justify-between mb-1.5">
           <span style={{ fontSize: 11, color: C.text, fontWeight: 600 }}>¿Quién bloca?</span>
@@ -302,8 +358,6 @@ export function TagPanel(p: Props) {
         </div>
       </div>
 
-      {/* FASE del ataque: se elige ANTES de anotar. Se aplica a tiro y pérdida (base de la
-          eficiencia por fase y, en espejo, de la eficacia defensiva del rival). */}
       <div className="p-2.5 rounded-md" style={{ background: C.panel2, border: `1px solid ${C.line}` }}>
         <div className="flex items-center justify-between mb-1.5">
           <span style={{ fontSize: 11, color: C.text, fontWeight: 600 }}>Fase del ataque</span>
@@ -321,10 +375,17 @@ export function TagPanel(p: Props) {
           })}
         </div>
       </div>
+    </>
+  );
 
+  // ── Bloque: botonera de acciones ─────────────────────────────────────────
+  const actionsBlock = (
+    <>
       <div className="grid grid-cols-2 gap-1.5">
         {ACTIONS.filter((a) => a.type !== EventType.NEAR_PASS).map((a) => (
-          <button key={a.key} onClick={() => p.tag(a)} className="py-2.5 rounded-md text-sm flex items-center justify-center gap-1.5" style={{ background: C.panel2, border: `1px solid ${C.line}`, color: C.text, fontWeight: 500 }}>
+          <button key={a.key} onClick={() => handleAction(a)}
+            className={wide ? 'py-3.5 rounded-md text-sm flex items-center justify-center gap-1.5' : 'py-2.5 rounded-md text-sm flex items-center justify-center gap-1.5'}
+            style={{ background: C.panel2, border: `1px solid ${C.line}`, color: C.text, fontWeight: 500 }}>
             <span className="w-2 h-2 rounded-full" style={{ background: TONE[a.tone] }} />{a.label}
           </button>
         ))}
@@ -332,6 +393,52 @@ export function TagPanel(p: Props) {
       <div className="text-center" style={{ fontSize: 11, color: C.faint }}>
         Sella en <span style={{ fontFamily: MONO, color: C.amber }}>{fmt(p.time)}</span> · jugador #{p.player} · {team.name}
       </div>
+    </>
+  );
+
+  const modal = pendingAction && (
+    <TacticalContextModal
+      action={pendingAction}
+      playerLabel={pendingAction.teamOnly ? team.name : `#${p.player} · ${team.name}`}
+      accent={accent}
+      onPick={(ctx) => { p.tag(pendingAction, ctx); setPendingAction(null); }}
+      onSkip={() => { p.tag(pendingAction, null); setPendingAction(null); }}
+      onCancel={() => setPendingAction(null)}
+    />
+  );
+
+  if (wide) {
+    return (
+      <div className="p-4 grid gap-4" style={{ gridTemplateColumns: 'minmax(280px, 340px) minmax(360px, 1fr) minmax(260px, 320px)', alignItems: 'start' }}>
+        {/* Columna 1: jugadores */}
+        <div className="flex flex-col gap-3">
+          {teamSwitchBlock}
+          {autoSwitchBlock}
+          {periodRosterHeaderBlock}
+          {p.editRoster ? rosterEditorBlock : playerGridBlock}
+          {goalkeeperBlock}
+          {substitutionBlock}
+        </div>
+        {/* Columna 2: dónde lanza / a dónde va */}
+        <div className="flex flex-col gap-3">{shotEntryBlock}</div>
+        {/* Columna 3: acciones */}
+        <div className="flex flex-col gap-3">{actionsBlock}</div>
+        {modal}
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-3 flex flex-col gap-3">
+      {teamSwitchBlock}
+      {autoSwitchBlock}
+      {periodRosterHeaderBlock}
+      {p.editRoster ? rosterEditorBlock : playerGridBlock}
+      {goalkeeperBlock}
+      {substitutionBlock}
+      {shotEntryBlock}
+      {actionsBlock}
+      {modal}
     </div>
   );
 }

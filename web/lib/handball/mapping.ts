@@ -1,4 +1,4 @@
-import { EventType, ShotOrigin, ShotOutcome, AttackPhase, MatchEvent, recomputeAggregates } from '@handball/core';
+import { EventType, ShotOrigin, ShotOutcome, AttackPhase, TacticalContext, MatchEvent, recomputeAggregates } from '@handball/core';
 import type { ResolvedRoster, ResolvedPlayer, ResolvedTeam, MatchSummary, PlayerLine } from '@handball/core';
 
 export type Side = 'HOME' | 'AWAY';
@@ -16,6 +16,11 @@ export interface UiEvent {
   isPenalty?: boolean;
   /** Fase del ataque (posicional / contraataque). La llevan SHOT y TURNOVER; base de la eficiencia por fase. */
   phase?: AttackPhase;
+  /**
+   * Combinación táctica previa a la acción (permuta/cruce/desdoblamiento/cortina). Paso OPCIONAL
+   * y saltable: la llevan SHOT y TURNOVER, igual que `phase`. `null`/`undefined` = no clasificada.
+   */
+  tacticalContext?: TacticalContext | null;
   /** En SUBSTITUTION: dorsal que SALE de pista (playerNumber es el que ENTRA). Base del ±. */
   subOutNumber?: number | null;
 }
@@ -84,12 +89,13 @@ export function toCanonicalEvents(
         zone: e.zone ?? undefined,
         isPenalty: e.isPenalty ?? false,
         phase: e.phase ?? undefined,
+        tacticalContext: e.tacticalContext ?? undefined,
         goalkeeperId: e.outcome === ShotOutcome.SAVED ? `${opp}:${activeGk[opp]}` : null,
         blockerId: e.outcome === ShotOutcome.BLOCKED && e.blockerNumber != null
           ? `${opp}:${e.blockerNumber}` : null,
       };
     } else if (e.type === EventType.TURNOVER) {
-      payload = { phase: e.phase ?? undefined };
+      payload = { phase: e.phase ?? undefined, tacticalContext: e.tacticalContext ?? undefined };
     } else if (e.type === EventType.SUBSTITUTION) {
       payload = {
         playerOutId: e.subOutNumber != null ? `${e.side}:${e.subOutNumber}` : null,
@@ -152,7 +158,7 @@ export function liveStats(meta: MatchMeta, events: UiEvent[], home: UiTeam, away
 
 // Reexportes para que la UI importe todo lo "handball" desde un único sitio.
 export { EventType, ShotOrigin, ShotOutcome } from '@handball/core';
-export { AttackPhase } from '@handball/core';
+export { AttackPhase, TacticalContext } from '@handball/core';
 export { PLAY_SCORE_WEIGHTS, computePlayScore } from '@handball/core';
 export type { MatchEvent } from '@handball/core';
 export type { MatchSummary, TeamSummary, PlayerLine, PlayScore, PlayScoreTerm, OriginCount, OriginBreakdown } from '@handball/core';

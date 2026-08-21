@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { newDb } from 'pg-mem';
 import { makePgCatalogRepository } from '../lib/db/catalog-repo.pg';
+import { inMemoryCatalogRepo } from '../features/catalog/repository';
 
 async function main() {
   const mem = newDb();
@@ -95,6 +96,47 @@ async function main() {
     const p = await repo.addPlayer({ clubId: club.id, season: '26/27', number: 8, name: 'Pivote' });
     await repo.removePlayer(p.id);
     assert.equal((await repo.listRoster(club.id, '26/27')).length, 0);
+  });
+
+  await check('updateClub con patch parcial NO borra los campos que no incluye (pg)', async () => {
+    const club = await repo.createClub({ name: 'CB Ribera', shortName: 'RIB', color: '#33aa55' });
+    const upd = await repo.updateClub(club.id, { name: 'CB Ribera Actualizado' });
+    assert.equal(upd?.name, 'CB Ribera Actualizado');
+    assert.equal(upd?.shortName, 'RIB'); // no se ha borrado por no venir en el patch
+    assert.equal(upd?.color, '#33aa55');
+  });
+
+  await check('CATÁLOGO EN MEMORIA: updateClub y updatePlayer con patch parcial no borran el resto', async () => {
+    const club = await inMemoryCatalogRepo.createClub({ name: 'CB Puente', shortName: 'PTE', color: '#112233' });
+    const updClub = await inMemoryCatalogRepo.updateClub(club.id, { color: '#ffcc00' });
+    assert.equal(updClub?.name, 'CB Puente'); // el nombre no venía en el patch: se conserva
+    assert.equal(updClub?.shortName, 'PTE');
+    assert.equal(updClub?.color, '#ffcc00');
+
+    await inMemoryCatalogRepo.ensureSeason('26/27');
+    const p = await inMemoryCatalogRepo.addPlayer({ clubId: club.id, season: '26/27', number: 6, name: 'Central', position: 'GK' });
+    const updPlayer = await inMemoryCatalogRepo.updatePlayer(p.id, { active: false });
+    assert.equal(updPlayer?.active, false);
+    assert.equal(updPlayer?.number, 6); // no venía en el patch: se conserva
+    assert.equal(updPlayer?.name, 'Central');
+    assert.equal(updPlayer?.position, 'GK');
+  });
+
+  await check('FOTO: updateClub y updatePlayer persisten photoUrl (columna de la migración v5)', async () => {
+    const club = await repo.createClub({ name: 'CB Foto' });
+    const updClub = await repo.updateClub(club.id, { photoUrl: '/api/catalog/clubs/x/photo' });
+    assert.equal(updClub?.photoUrl, '/api/catalog/clubs/x/photo');
+    assert.equal((await repo.getClub(club.id))?.photoUrl, '/api/catalog/clubs/x/photo');
+
+    await repo.ensureSeason('26/27');
+    const p = await repo.addPlayer({ clubId: club.id, season: '26/27', number: 5, name: 'Foto Jugador' });
+    const updPlayer = await repo.updatePlayer(p.id, { photoUrl: '/api/catalog/players/y/photo' });
+    assert.equal(updPlayer?.photoUrl, '/api/catalog/players/y/photo');
+    assert.equal((await repo.getPlayer(p.id))?.photoUrl, '/api/catalog/players/y/photo');
+
+    // Borrado de foto: se guarda como '' y se distingue de "sin tocar" (undefined).
+    const cleared = await repo.updateClub(club.id, { photoUrl: '' });
+    assert.equal(cleared?.photoUrl, '');
   });
 
   await check('PERSISTENCIA: una instancia nueva del repo ve los datos ya guardados', async () => {

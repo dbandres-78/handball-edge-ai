@@ -50,12 +50,26 @@ export enum AttackPhase {
   COUNTER = 'COUNTER',         // contraataque / transición
 }
 
+/**
+ * Combinación táctica que precede a la acción terminal (tiro o pérdida). Es un paso OPCIONAL
+ * de anotación (se puede saltar): clasifica cómo se generó el espacio antes del desenlace, no
+ * el desenlace en sí. Sin valor, no se interpreta "no hubo combinación" de forma fiable — solo
+ * que no se clasificó (podría no haberla habido, o el anotador la saltó por agilidad).
+ */
+export enum TacticalContext {
+  PERMUTA = 'PERMUTA',                 // intercambio de puesto entre dos atacantes
+  CRUCE = 'CRUCE',                     // cruce de trayectorias entre dos atacantes con balón
+  DESDOBLAMIENTO = 'DESDOBLAMIENTO',   // un atacante se desdobla tras pasar y ataca el espacio
+  CORTINA = 'CORTINA',                 // bloqueo/pantalla de un atacante sin balón para liberar a otro
+}
+
 export interface ShotPayload {
   outcome: ShotOutcome;
   origin?: ShotOrigin;           // desde dónde se lanza  -> input de xG
   zone?: number;                 // 1..9 (zona de portería) -> input de xGOT (colocación)
   isPenalty?: boolean;
   phase?: AttackPhase;           // fase del ataque (posicional / contraataque) -> eficiencia por fase
+  tacticalContext?: TacticalContext;   // combinación previa (opcional, saltable) -> permuta/cruce/desdoblamiento/cortina
   goalkeeperId?: string | null;  // portero rival implicado (si SAVED)
   blockerId?: string | null;     // defensor que bloca (si BLOCKED); sin él, el blocaje no se atribuye
 }
@@ -63,6 +77,7 @@ export interface ShotPayload {
 /** Pérdida de balón. Cierra la posesión; lleva la fase para la eficiencia por fase. */
 export interface TurnoverPayload {
   phase?: AttackPhase;
+  tacticalContext?: TacticalContext;   // combinación previa (opcional, saltable)
 }
 
 /**

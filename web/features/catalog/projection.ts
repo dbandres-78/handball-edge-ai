@@ -17,6 +17,8 @@ export interface PlayerEff {
 }
 export interface PlayerCard {
   playerId: string; personId: string; number: number; name: string; position: string;
+  /** Foto del jugador (ruta de servido del catálogo), enriquecida fuera de la agregación. */
+  photoUrl?: string;
   games: number;
   minutesTotal: number; minutesAvg: number | null;
   playScoreTotal: number; playScoreAvg: number | null;

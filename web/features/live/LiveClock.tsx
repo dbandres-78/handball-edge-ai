@@ -14,15 +14,23 @@ interface Props {
   periodMinutes: number;
   homeName: string; awayName: string;
   homeGoals: number; awayGoals: number;
+  /**
+   * Barra compacta para la cabecera: mismo reloj, mismo marcador, todo en una sola fila y sin el
+   * párrafo explicativo. Libera la pantalla para dar protagonismo a la zona de lanzamiento, la
+   * portería y los jugadores — el reloj deja de "robar" media pantalla en cada corte.
+   */
+  compact?: boolean;
 }
 
 /**
  * Pieza central del modo directo: el reloj manda. Grande y legible desde lejos porque el
- * anotador está mirando la pista, no la pantalla.
+ * anotador está mirando la pista, no la pantalla. En su variante `compact` vive en la cabecera.
  */
 export function LiveClock(p: Props) {
   const limit = p.periodMinutes * 60 * p.period;
   const overtime = p.seconds > limit;
+
+  if (p.compact) return <LiveClockBar {...p} overtime={overtime} />;
 
   return (
     <div className="flex-1 flex flex-col items-center justify-center gap-6 p-6">
@@ -85,6 +93,48 @@ export function LiveClock(p: Props) {
 }
 
 const running = (p: Props) => p.running;
+
+/** Variante compacta: marcador + reloj + controles en una sola fila, para la cabecera. */
+function LiveClockBar(p: Props & { overtime: boolean }) {
+  return (
+    <div className="flex items-center gap-3 px-4 py-2 flex-wrap" style={{ background: C.panel, borderBottom: `1px solid ${C.line}` }}>
+      <div className="flex items-center gap-2 min-w-0">
+        <span className="truncate" style={{ fontSize: 13, fontWeight: 600, color: C.home, maxWidth: 140 }}>{p.homeName}</span>
+        <span style={{ fontFamily: MONO, fontSize: 22, fontWeight: 700, color: C.text }}>{String(p.homeGoals).padStart(2, '0')}</span>
+      </div>
+      <span style={{ fontFamily: MONO, fontSize: 16, color: C.faint }}>—</span>
+      <div className="flex items-center gap-2 min-w-0">
+        <span style={{ fontFamily: MONO, fontSize: 22, fontWeight: 700, color: C.text }}>{String(p.awayGoals).padStart(2, '0')}</span>
+        <span className="truncate" style={{ fontSize: 13, fontWeight: 600, color: C.away, maxWidth: 140 }}>{p.awayName}</span>
+      </div>
+
+      <div className="flex items-center gap-2 mx-2">
+        <div className="px-3 py-1 rounded-lg" style={{ background: C.bg, border: `1px solid ${p.overtime ? C.neg : p.running ? C.amber : C.line}` }}>
+          <span style={{ fontFamily: MONO, fontSize: 26, fontWeight: 700, letterSpacing: 1.5, color: p.overtime ? C.neg : C.amber }}>{fmt(p.seconds)}</span>
+        </div>
+        <button onClick={p.onToggle} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm"
+          style={{ background: p.running ? C.panel3 : C.amber, color: p.running ? C.text : '#0E1420', fontWeight: 700, border: `1px solid ${C.line}` }}>
+          {p.running ? <Pause size={14} /> : <Play size={14} />}
+        </button>
+        <Small onClick={() => p.onAdjust(-10)} title="−10 s"><Minus size={12} />10s</Small>
+        <Small onClick={() => p.onAdjust(10)} title="+10 s"><Plus size={12} />10s</Small>
+        <Small onClick={p.onResetPeriod} title={`Ir al inicio de la parte ${p.period}`}><RotateCcw size={12} /></Small>
+      </div>
+
+      <div className="flex items-center gap-1">
+        {[1, 2, 3, 4].map((n) => (
+          <button key={n} onClick={() => p.setPeriod(n)} className="w-7 h-7 rounded-md text-xs"
+            style={{ fontFamily: MONO, fontWeight: 700,
+              background: p.period === n ? C.panel3 : C.panel2,
+              color: p.period === n ? C.text : C.muted, border: `1px solid ${C.line}` }}>
+            {n}
+          </button>
+        ))}
+        {p.overtime && <span style={{ fontSize: 10, color: C.neg, marginLeft: 4 }}>tiempo cumplido</span>}
+      </div>
+    </div>
+  );
+}
 
 function TeamScore({ name, goals, color, align }: { name: string; goals: number; color: string; align: 'left' | 'right' }) {
   return (

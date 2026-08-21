@@ -8,11 +8,13 @@ import { getPool, type Queryable } from './pg';
 
 const rowToClub = (r: any): Club => ({
   id: r.id, name: r.name, shortName: r.short_name ?? undefined, color: r.color ?? undefined,
+  photoUrl: r.photo_url ?? undefined,
 });
 
 const rowToPlayer = (r: any): RosterPlayer => ({
   id: r.id, clubId: r.club_id, season: r.season, number: r.number, name: r.name,
   position: r.position ?? undefined, personId: r.person_id ?? r.id, active: !!r.active,
+  photoUrl: r.photo_url ?? undefined,
 });
 
 export interface PgCatalogRepository extends CatalogRepository {
@@ -47,20 +49,30 @@ export function makePgCatalogRepository(db: Queryable): PgCatalogRepository {
       return r ? rowToClub(r) : null;
     },
     async createClub(input: NewClubInput) {
-      const club: Club = { id: newCatalogId('CLUB'), name: input.name, shortName: input.shortName, color: input.color };
+      const club: Club = {
+        id: newCatalogId('CLUB'), name: input.name, shortName: input.shortName, color: input.color,
+        photoUrl: input.photoUrl,
+      };
       await db.query(
-        'INSERT INTO club(id, name, short_name, color) VALUES ($1,$2,$3,$4)',
-        [club.id, club.name, club.shortName ?? null, club.color ?? null],
+        'INSERT INTO club(id, name, short_name, color, photo_url) VALUES ($1,$2,$3,$4,$5)',
+        [club.id, club.name, club.shortName ?? null, club.color ?? null, club.photoUrl ?? null],
       );
       return club;
     },
     async updateClub(id, patch) {
       const current = await repo.getClub(id);
       if (!current) return null;
-      const next: Club = { ...current, ...patch };
+      // Fusión campo a campo: un patch parcial no debe borrar los campos que no incluye.
+      const next: Club = {
+        ...current,
+        name: patch.name ?? current.name,
+        shortName: patch.shortName ?? current.shortName,
+        color: patch.color ?? current.color,
+        photoUrl: patch.photoUrl ?? current.photoUrl,
+      };
       await db.query(
-        'UPDATE club SET name=$2, short_name=$3, color=$4 WHERE id=$1',
-        [id, next.name, next.shortName ?? null, next.color ?? null],
+        'UPDATE club SET name=$2, short_name=$3, color=$4, photo_url=$5 WHERE id=$1',
+        [id, next.name, next.shortName ?? null, next.color ?? null, next.photoUrl ?? null],
       );
       return next;
     },
@@ -98,8 +110,8 @@ export function makePgCatalogRepository(db: Queryable): PgCatalogRepository {
       if (!current) return null;
       const next = rowToPlayer({ ...current, ...toRow(patch, current) });
       await db.query(
-        'UPDATE roster_player SET number=$2, name=$3, position=$4, active=$5 WHERE id=$1',
-        [id, next.number, next.name, next.position ?? null, next.active],
+        'UPDATE roster_player SET number=$2, name=$3, position=$4, active=$5, photo_url=$6 WHERE id=$1',
+        [id, next.number, next.name, next.position ?? null, next.active, next.photoUrl ?? null],
       );
       return next;
     },
@@ -144,6 +156,7 @@ function toRow(patch: RosterPlayerPatch, current: any) {
     name: patch.name ?? current.name,
     position: patch.position ?? current.position,
     active: patch.active ?? current.active,
+    photo_url: patch.photoUrl ?? current.photo_url,
   };
 }
 

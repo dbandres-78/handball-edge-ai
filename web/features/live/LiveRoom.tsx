@@ -5,7 +5,7 @@ import { ListOrdered, BarChart3, Save, Download, ArrowLeft, Radio } from 'lucide
 import { PALETTE as C, MONO } from '@/lib/theme';
 import { fmt } from '@/lib/handball/format';
 import { ActionDef, ACTIONS } from '@/lib/handball/actions';
-import { EventType, ShotOrigin, ShotOutcome, UiEvent, UiTeam, Side, liveStats, AttackPhase } from '@/lib/handball/mapping';
+import { EventType, ShotOrigin, ShotOutcome, UiEvent, UiTeam, Side, liveStats, AttackPhase, TacticalContext } from '@/lib/handball/mapping';
 import type { LoadedMatch } from '@/features/matches/types';
 import { TagPanel } from '@/features/analysis/TagPanel';
 import { StatsPanel } from '@/features/analysis/StatsPanel';
@@ -69,7 +69,7 @@ export function LiveRoom({ match }: { match: LoadedMatch }) {
     return () => clearTimeout(id);
   }, [home, away, match.matchId]);
 
-  const tag = (a: ActionDef) => {
+  const tag = (a: ActionDef, tacticalContext?: TacticalContext | null) => {
     const t = clock.now();                       // instante exacto, no el último tick
     const carriesPhase = a.type === EventType.SHOT || a.type === EventType.TURNOVER;
     const e: UiEvent = {
@@ -80,6 +80,7 @@ export function LiveRoom({ match }: { match: LoadedMatch }) {
       blockerNumber: a.outcome === ShotOutcome.BLOCKED ? blocker : null,
       isPenalty: a.shot && isPenalty ? true : undefined,
       phase: carriesPhase ? phase : undefined,
+      tacticalContext: carriesPhase ? tacticalContext ?? undefined : undefined,
     };
     const next = [...events, e].sort((x, y) => x.t - y.t);
     setEvents(next);
@@ -221,7 +222,16 @@ export function LiveRoom({ match }: { match: LoadedMatch }) {
         </span>
         <span style={{ fontSize: 12, color: C.muted }}>{meta.competition}{meta.matchday ? ` · J${meta.matchday}` : ''}</span>
 
-        <div className="flex items-center gap-1.5 ml-auto">
+        <div className="flex items-center gap-1 ml-auto">
+          {([['tag', 'Anotar', ListOrdered], ['stats', 'Estadística', BarChart3]] as const).map(([k, l, Ic]) => (
+            <button key={k} onClick={() => setTab(k)} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm"
+              style={{ color: tab === k ? C.text : C.muted, fontWeight: tab === k ? 600 : 500, background: tab === k ? C.panel3 : 'transparent', border: `1px solid ${tab === k ? C.line : 'transparent'}` }}>
+              <Ic size={14} /> {l}
+            </button>
+          ))}
+        </div>
+        <span style={{ color: C.line }}>/</span>
+        <div className="flex items-center gap-1.5">
           <SyncBadge state={persistence.state} error={persistence.lastError} lastSyncedAt={persistence.lastSyncedAt} />
           <button onClick={onSave} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm" style={{ border: `1px solid ${C.line}`, color: C.muted }}>
             <Save size={14} /> Guardar
@@ -235,6 +245,26 @@ export function LiveRoom({ match }: { match: LoadedMatch }) {
         </div>
       </div>
 
+      {/* Reloj compacto: vive en la cabecera para dejar toda la pantalla a la zona de
+          lanzamiento, la portería y los jugadores — el objetivo es agilidad en los cortes. */}
+      <LiveClock
+        compact
+        seconds={clock.seconds} running={clock.running} onToggle={clock.toggle} onAdjust={clock.adjust}
+        onResetPeriod={() => clock.set((period - 1) * periodMinutes * 60)}
+        period={period} setPeriod={setPeriod} periodMinutes={periodMinutes}
+        homeName={home.name} awayName={away.name}
+        homeGoals={stats.summary.home.goals} awayGoals={stats.summary.away.goals}
+      />
+
+      {/* ── TECLA DE PASES A 10 M ───────────────────────────────────────────
+          Suma al equipo que atacas (side). Se acciona con Shift (⇧) o con +1.
+          Color morado para destacar sobre local/visitante y el ámbar del reloj. */}
+      <div className="px-4 py-2" style={{ borderBottom: `1px solid ${C.line}` }}>
+        <NearPassBar side={side} homeName={home.name} awayName={away.name}
+          homeCount={stats.summary.home.nearPasses} awayCount={stats.summary.away.nearPasses}
+          onAdd={recordNearPass} onUndo={undoNearPass} />
+      </div>
+
       {persistence.recovered && (
         <RecoveryBanner
           count={persistence.recovered.events.length}
@@ -243,56 +273,28 @@ export function LiveRoom({ match }: { match: LoadedMatch }) {
         />
       )}
 
-      <div className="flex flex-col lg:flex-row flex-1 min-h-0">
-        {/* Reloj + marcador */}
-        <div className="flex-1 min-h-0 flex flex-col relative">
-          <LiveClock
-            seconds={clock.seconds} running={clock.running} onToggle={clock.toggle} onAdjust={clock.adjust}
-            onResetPeriod={() => clock.set((period - 1) * periodMinutes * 60)}
-            period={period} setPeriod={setPeriod} periodMinutes={periodMinutes}
-            homeName={home.name} awayName={away.name}
-            homeGoals={stats.summary.home.goals} awayGoals={stats.summary.away.goals}
-          />
+      {/* Cuerpo: la zona de lanzamiento, la portería y los jugadores ocupan toda la pantalla. */}
+      <div className="flex-1 min-h-0 overflow-y-auto relative" style={{ background: C.bg }}>
+        {tab === 'tag' ? (
+          <TagPanel layout="wide"
+            side={side} setSide={setSide} autoSwitch={autoSwitch} setAutoSwitch={setAutoSwitch} player={player} setPlayer={setPlayer} period={period} setPeriod={setPeriod}
+            zone={zone} setZone={setZone} origin={origin} setOrigin={setOrigin} blocker={blocker} setBlocker={setBlocker} isPenalty={isPenalty} setIsPenalty={setIsPenalty}
+            phase={phase} setPhase={setPhase}
+            home={home} away={away} setHome={setHome} setAway={setAway}
+            editRoster={editRoster} setEditRoster={setEditRoster} tag={tag} time={clock.seconds}
+            activeGk={activeGk[side]} onGkChange={onGkChange} events={events} recordSub={recordSub}
+            matchId={match.matchId} season={match.season} onLinkedToCatalog={(h, a) => { setHome(h); setAway(a); }} />
+        ) : (
+          <div className="p-4">
+            <StatsPanel stats={stats} statTeam={statTeam} setStatTeam={setStatTeam} expanded={expanded} setExpanded={setExpanded} events={events} />
+          </div>
+        )}
 
-          {/* ── TECLA DE PASES A 10 M ─────────────────────────────────────────
-              Suma al equipo que atacas (side). Se acciona con Shift (⇧) o con +1.
-              Color morado para destacar sobre local/visitante y el ámbar del reloj. */}
-          <div className="px-6 pb-5">
-            <NearPassBar side={side} homeName={home.name} awayName={away.name}
-              homeCount={stats.summary.home.nearPasses} awayCount={stats.summary.away.nearPasses}
-              onAdd={recordNearPass} onUndo={undoNearPass} />
+        {flash && (
+          <div className="fixed left-4 bottom-4 px-3 py-1.5 rounded-md text-sm" style={{ background: C.panel2, border: `1px solid ${C.line}`, fontFamily: MONO, zIndex: 40 }}>
+            {flash}
           </div>
-          {flash && (
-            <div className="absolute left-4 bottom-4 px-3 py-1.5 rounded-md text-sm" style={{ background: C.panel2, border: `1px solid ${C.line}`, fontFamily: MONO }}>
-              {flash}
-            </div>
-          )}
-        </div>
-
-        {/* Panel de anotación */}
-        <div className="lg:w-96 flex flex-col min-h-0" style={{ borderLeft: `1px solid ${C.line}`, background: C.panel }}>
-          <div className="flex" style={{ borderBottom: `1px solid ${C.line}` }}>
-            {([['tag', 'Anotar', ListOrdered], ['stats', 'Estadística', BarChart3]] as const).map(([k, l, Ic]) => (
-              <button key={k} onClick={() => setTab(k)} className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-sm"
-                style={{ color: tab === k ? C.text : C.muted, fontWeight: tab === k ? 600 : 500, borderBottom: `2px solid ${tab === k ? C.amber : 'transparent'}`, background: tab === k ? C.panel2 : 'transparent' }}>
-                <Ic size={15} /> {l}
-              </button>
-            ))}
-          </div>
-          <div className="flex-1 min-h-0 overflow-y-auto">
-            {tab === 'tag' ? (
-              <TagPanel side={side} setSide={setSide} autoSwitch={autoSwitch} setAutoSwitch={setAutoSwitch} player={player} setPlayer={setPlayer} period={period} setPeriod={setPeriod}
-                zone={zone} setZone={setZone} origin={origin} setOrigin={setOrigin} blocker={blocker} setBlocker={setBlocker} isPenalty={isPenalty} setIsPenalty={setIsPenalty}
-                phase={phase} setPhase={setPhase}
-                home={home} away={away} setHome={setHome} setAway={setAway}
-                editRoster={editRoster} setEditRoster={setEditRoster} tag={tag} time={clock.seconds}
-                activeGk={activeGk[side]} onGkChange={onGkChange} events={events} recordSub={recordSub}
-                matchId={match.matchId} season={match.season} onLinkedToCatalog={(h, a) => { setHome(h); setAway(a); }} />
-            ) : (
-              <StatsPanel stats={stats} statTeam={statTeam} setStatTeam={setStatTeam} expanded={expanded} setExpanded={setExpanded} events={events} />
-            )}
-          </div>
-        </div>
+        )}
       </div>
 
       <EventLog events={events} home={home} away={away} seek={() => { /* en directo no hay a dónde saltar */ }} delEvent={delEvent} editEvent={editEvent} />

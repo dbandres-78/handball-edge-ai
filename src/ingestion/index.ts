@@ -15,6 +15,7 @@ export {
   ShotOrigin,
   ShotOutcome,
   AttackPhase,
+  TacticalContext,
 } from './domain/match-event';
 export type { ShotPayload, TurnoverPayload, MatchEvent } from './domain/match-event';
 

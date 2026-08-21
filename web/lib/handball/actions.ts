@@ -1,4 +1,4 @@
-import { EventType, ShotOutcome } from '@handball/core';
+import { EventType, ShotOutcome, TacticalContext } from '@handball/core';
 
 export type Tone = 'goal' | 'save' | 'miss' | 'neg' | 'pos' | 'warn' | 'neutral';
 
@@ -32,6 +32,29 @@ export const ACTIONS: ActionDef[] = [
 export const actionByType = (type: EventType, outcome: ShotOutcome | null): ActionDef | undefined => {
   if (type === EventType.SHOT) return ACTIONS.find((a) => a.type === EventType.SHOT && a.outcome === outcome);
   return ACTIONS.find((a) => a.type === type);
+};
+
+/** Tiro o pérdida: las únicas acciones "terminales" que llevan fase y combinación táctica previa. */
+export const isTerminalAction = (a: Pick<ActionDef, 'type'>): boolean =>
+  a.type === EventType.SHOT || a.type === EventType.TURNOVER;
+
+/** Combinaciones tácticas previas a la acción terminal. Paso opcional y saltable en la anotación. */
+export const TACTICAL_CONTEXTS: TacticalContext[] = [
+  TacticalContext.PERMUTA, TacticalContext.CRUCE, TacticalContext.DESDOBLAMIENTO, TacticalContext.CORTINA,
+];
+
+export const TACTICAL_CONTEXT_LABEL: Record<TacticalContext, string> = {
+  [TacticalContext.PERMUTA]: 'Permuta',
+  [TacticalContext.CRUCE]: 'Cruce',
+  [TacticalContext.DESDOBLAMIENTO]: 'Desdoblamiento',
+  [TacticalContext.CORTINA]: 'Cortina',
+};
+
+export const TACTICAL_CONTEXT_SHORT: Record<TacticalContext, string> = {
+  [TacticalContext.PERMUTA]: 'permuta',
+  [TacticalContext.CRUCE]: 'cruce',
+  [TacticalContext.DESDOBLAMIENTO]: 'desdobl.',
+  [TacticalContext.CORTINA]: 'cortina',
 };
 
 export const TERM_ES: Record<string, string> = {

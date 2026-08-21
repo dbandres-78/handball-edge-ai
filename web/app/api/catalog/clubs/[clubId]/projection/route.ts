@@ -30,7 +30,7 @@ export async function GET(req: Request, { params }: { params: { clubId: string }
   if (projection) {
     const resolved = await Promise.all(projection.players.map(async (p) => {
       const rp = await catalog.getPlayer(p.playerId);
-      if (rp) p.personId = rp.personId;
+      if (rp) { p.personId = rp.personId; p.photoUrl = rp.photoUrl; }
       return { p, exists: !!rp };
     }));
     projection.players = resolved.filter((r) => r.exists).map((r) => r.p);

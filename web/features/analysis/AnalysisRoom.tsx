@@ -5,7 +5,7 @@ import { PALETTE as C } from '@/lib/theme';
 import { fmt } from '@/lib/handball/format';
 import { ActionDef, ACTIONS } from '@/lib/handball/actions';
 import {
-  EventType, ShotOrigin, ShotOutcome, UiEvent, UiClip, UiTeam, Side, liveStats, AttackPhase,
+  EventType, ShotOrigin, ShotOutcome, UiEvent, UiClip, UiTeam, Side, liveStats, AttackPhase, TacticalContext,
 } from '@/lib/handball/mapping';
 import {
   deriveClips, DEFAULT_CLIP_WINDOW, DerivedClip, ClipFilter, ClipWindow, ClipOverride,
@@ -138,7 +138,7 @@ export function AnalysisRoom({ match }: { match: LoadedMatch }) {
     doFlash(`Cambio · sale #${outN}, entra #${inN} · ${teamName} · ${fmt(time)}`);
   };
 
-  const tag = (a: ActionDef) => {
+  const tag = (a: ActionDef, tacticalContext?: TacticalContext | null) => {
     const carriesPhase = a.type === EventType.SHOT || a.type === EventType.TURNOVER;
     const e: UiEvent = {
       id: idRef.current++, t: time, period, side,
@@ -148,6 +148,7 @@ export function AnalysisRoom({ match }: { match: LoadedMatch }) {
       blockerNumber: a.outcome === ShotOutcome.BLOCKED ? blocker : null,
       isPenalty: a.shot && isPenalty ? true : undefined,
       phase: carriesPhase ? phase : undefined,
+      tacticalContext: carriesPhase ? tacticalContext ?? undefined : undefined,
     };
     const next = [...events, e].sort((x, y) => x.t - y.t);
     setEvents(next);
