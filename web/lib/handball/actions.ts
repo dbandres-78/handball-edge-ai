@@ -1,4 +1,4 @@
-import { EventType, ShotOutcome, TacticalContext } from '@handball/core';
+import { EventType, ShotOutcome, TacticalContext, TurnoverReason } from '@handball/core';
 
 export type Tone = 'goal' | 'save' | 'miss' | 'neg' | 'pos' | 'warn' | 'neutral';
 
@@ -38,9 +38,14 @@ export const actionByType = (type: EventType, outcome: ShotOutcome | null): Acti
 export const isTerminalAction = (a: Pick<ActionDef, 'type'>): boolean =>
   a.type === EventType.SHOT || a.type === EventType.TURNOVER;
 
-/** Combinaciones tácticas previas a la acción terminal. Paso opcional y saltable en la anotación. */
+/**
+ * Combinaciones tácticas previas a la acción terminal. Paso opcional y saltable en la anotación.
+ * ACCION_INDIVIDUAL es una clasificación explícita más (no hubo combinación, resolvió solo),
+ * distinta de "saltar" (que deja la jugada sin clasificar del todo).
+ */
 export const TACTICAL_CONTEXTS: TacticalContext[] = [
   TacticalContext.PERMUTA, TacticalContext.CRUCE, TacticalContext.DESDOBLAMIENTO, TacticalContext.CORTINA,
+  TacticalContext.ACCION_INDIVIDUAL,
 ];
 
 export const TACTICAL_CONTEXT_LABEL: Record<TacticalContext, string> = {
@@ -48,6 +53,7 @@ export const TACTICAL_CONTEXT_LABEL: Record<TacticalContext, string> = {
   [TacticalContext.CRUCE]: 'Cruce',
   [TacticalContext.DESDOBLAMIENTO]: 'Desdoblamiento',
   [TacticalContext.CORTINA]: 'Cortina',
+  [TacticalContext.ACCION_INDIVIDUAL]: 'Acción individual',
 };
 
 export const TACTICAL_CONTEXT_SHORT: Record<TacticalContext, string> = {
@@ -55,11 +61,28 @@ export const TACTICAL_CONTEXT_SHORT: Record<TacticalContext, string> = {
   [TacticalContext.CRUCE]: 'cruce',
   [TacticalContext.DESDOBLAMIENTO]: 'desdobl.',
   [TacticalContext.CORTINA]: 'cortina',
+  [TacticalContext.ACCION_INDIVIDUAL]: 'individual',
+};
+
+/** Motivo de la pérdida. Paso opcional y saltable, igual que la combinación táctica previa. */
+export const TURNOVER_REASONS: TurnoverReason[] = [
+  TurnoverReason.FALTA_EN_ATAQUE, TurnoverReason.ROBO_DE_PASE, TurnoverReason.RECEPCION,
+  TurnoverReason.PISANDO_AREA, TurnoverReason.DOBLES, TurnoverReason.PASOS,
+];
+
+export const TURNOVER_REASON_LABEL: Record<TurnoverReason, string> = {
+  [TurnoverReason.FALTA_EN_ATAQUE]: 'Falta en ataque',
+  [TurnoverReason.ROBO_DE_PASE]: 'Robo de pase',
+  [TurnoverReason.RECEPCION]: 'Recepción',
+  [TurnoverReason.PISANDO_AREA]: 'Pisando área',
+  [TurnoverReason.DOBLES]: 'Dobles',
+  [TurnoverReason.PASOS]: 'Pasos',
 };
 
 export const TERM_ES: Record<string, string> = {
   goal: 'Goles', miss: 'Tiros fallados', turnover: 'Pérdidas', save: 'Paradas',
-  steal: 'Recuperaciones', block: 'Blocajes', foul: 'Faltas',
+  steal: 'Recuperaciones', block: 'Blocajes', foul: 'Faltas', assist: 'Asistencias',
+  foulsDrawn: 'Faltas provocadas',
   nearPasses: 'Pases a 10m',
   twoMinutes: "Exclusiones 2′", redCard: 'Tarjeta roja', plusMinus: 'Diferencial ±',
 };

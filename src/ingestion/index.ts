@@ -16,8 +16,9 @@ export {
   ShotOutcome,
   AttackPhase,
   TacticalContext,
+  TurnoverReason,
 } from './domain/match-event';
-export type { ShotPayload, TurnoverPayload, MatchEvent } from './domain/match-event';
+export type { ShotPayload, TurnoverPayload, FoulPayload, MatchEvent } from './domain/match-event';
 
 export {
   IngestionSource,
@@ -57,6 +58,9 @@ export { recomputeAggregates } from './application/recompute-aggregates';
 export type {
   OriginCount,
   OriginBreakdown,
+  TacticalCount,
+  TacticalBreakdown,
+  TurnoverBreakdown,
   TermOrigin,
   PlayScoreTerm,
   PlayScore,

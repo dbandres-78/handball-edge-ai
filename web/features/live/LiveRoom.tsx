@@ -5,7 +5,7 @@ import { ListOrdered, BarChart3, Save, Download, ArrowLeft, Radio } from 'lucide
 import { PALETTE as C, MONO } from '@/lib/theme';
 import { fmt } from '@/lib/handball/format';
 import { ActionDef, ACTIONS } from '@/lib/handball/actions';
-import { EventType, ShotOrigin, ShotOutcome, UiEvent, UiTeam, Side, liveStats, AttackPhase, TacticalContext } from '@/lib/handball/mapping';
+import { EventType, ShotOrigin, ShotOutcome, UiEvent, UiTeam, Side, liveStats, AttackPhase, TacticalContext, TurnoverReason } from '@/lib/handball/mapping';
 import type { LoadedMatch } from '@/features/matches/types';
 import { TagPanel } from '@/features/analysis/TagPanel';
 import { StatsPanel } from '@/features/analysis/StatsPanel';
@@ -44,6 +44,9 @@ export function LiveRoom({ match }: { match: LoadedMatch }) {
   const [zone, setZone] = useState<number | null>(null);
   const [origin, setOrigin] = useState<ShotOrigin | null>(null);
   const [blocker, setBlocker] = useState<number | null>(null);
+  const [assister, setAssister] = useState<number | null>(null);
+  const [drawnBy, setDrawnBy] = useState<number | null>(null);
+  const [turnoverReason, setTurnoverReason] = useState<TurnoverReason | null>(null);
   const [isPenalty, setIsPenalty] = useState(false);
   const [phase, setPhase] = useState<AttackPhase>(AttackPhase.POSITIONAL);
 
@@ -78,6 +81,9 @@ export function LiveRoom({ match }: { match: LoadedMatch }) {
       type: a.type, outcome: a.outcome ?? null, zone: a.shot ? zone : null,
       origin: a.shot ? origin : null,
       blockerNumber: a.outcome === ShotOutcome.BLOCKED ? blocker : null,
+      assisterNumber: a.outcome === ShotOutcome.GOAL ? assister : null,
+      drawnByNumber: a.type === EventType.FOUL ? drawnBy : null,
+      turnoverReason: a.type === EventType.TURNOVER ? turnoverReason : null,
       isPenalty: a.shot && isPenalty ? true : undefined,
       phase: carriesPhase ? phase : undefined,
       tacticalContext: carriesPhase ? tacticalContext ?? undefined : undefined,
@@ -85,7 +91,9 @@ export function LiveRoom({ match }: { match: LoadedMatch }) {
     const next = [...events, e].sort((x, y) => x.t - y.t);
     setEvents(next);
     void persistence.record(next);          // 1) dispositivo ya; 2) servidor por detrás
-    if (a.shot) { setZone(null); setOrigin(null); setBlocker(null); setIsPenalty(false); }
+    if (a.shot) { setZone(null); setOrigin(null); setBlocker(null); setIsPenalty(false); setAssister(null); }
+    if (a.type === EventType.FOUL) setDrawnBy(null);
+    if (a.type === EventType.TURNOVER) setTurnoverReason(null);
     // El tiempo muerto para el reloj: es la razón por la que el reloj se detiene en balonmano.
     if (a.type === EventType.TIMEOUT && clock.running) clock.pause();
     doFlash(`${a.label} · ${a.teamOnly ? (side === 'HOME' ? home.name : away.name) : '#' + player} · ${fmt(t)}`);
@@ -279,6 +287,8 @@ export function LiveRoom({ match }: { match: LoadedMatch }) {
           <TagPanel layout="wide"
             side={side} setSide={setSide} autoSwitch={autoSwitch} setAutoSwitch={setAutoSwitch} player={player} setPlayer={setPlayer} period={period} setPeriod={setPeriod}
             zone={zone} setZone={setZone} origin={origin} setOrigin={setOrigin} blocker={blocker} setBlocker={setBlocker} isPenalty={isPenalty} setIsPenalty={setIsPenalty}
+            assister={assister} setAssister={setAssister} drawnBy={drawnBy} setDrawnBy={setDrawnBy}
+            turnoverReason={turnoverReason} setTurnoverReason={setTurnoverReason}
             phase={phase} setPhase={setPhase}
             home={home} away={away} setHome={setHome} setAway={setAway}
             editRoster={editRoster} setEditRoster={setEditRoster} tag={tag} time={clock.seconds}

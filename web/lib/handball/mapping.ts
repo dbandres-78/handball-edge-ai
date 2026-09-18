@@ -1,4 +1,4 @@
-import { EventType, ShotOrigin, ShotOutcome, AttackPhase, TacticalContext, MatchEvent, recomputeAggregates } from '@handball/core';
+import { EventType, ShotOrigin, ShotOutcome, AttackPhase, TacticalContext, TurnoverReason, MatchEvent, recomputeAggregates } from '@handball/core';
 import type { ResolvedRoster, ResolvedPlayer, ResolvedTeam, MatchSummary, PlayerLine } from '@handball/core';
 
 export type Side = 'HOME' | 'AWAY';
@@ -12,6 +12,10 @@ export interface UiEvent {
   origin?: ShotOrigin | null;
   /** Defensor rival que bloca (si outcome = BLOCKED). Sin él, el blocaje no se atribuye a nadie. */
   blockerNumber?: number | null;
+  /** Compañero que asiste (si outcome = GOAL, mismo equipo). Sin él, no hay asistencia atribuida. */
+  assisterNumber?: number | null;
+  /** En FOUL: jugador rival que PROVOCA la falta (la sufre). Sin él, cuenta solo como cometida. */
+  drawnByNumber?: number | null;
   /** Es lanzamiento de 7 metros (penalti). Sin esto, contamina el xG (un 7 m no es un tiro en juego). */
   isPenalty?: boolean;
   /** Fase del ataque (posicional / contraataque). La llevan SHOT y TURNOVER; base de la eficiencia por fase. */
@@ -21,6 +25,11 @@ export interface UiEvent {
    * y saltable: la llevan SHOT y TURNOVER, igual que `phase`. `null`/`undefined` = no clasificada.
    */
   tacticalContext?: TacticalContext | null;
+  /**
+   * Motivo de la pérdida (falta en ataque/robo de pase/recepción/pisando área/dobles/pasos).
+   * Solo la lleva TURNOVER. Paso opcional y saltable, igual que `tacticalContext`.
+   */
+  turnoverReason?: TurnoverReason | null;
   /** En SUBSTITUTION: dorsal que SALE de pista (playerNumber es el que ENTRA). Base del ±. */
   subOutNumber?: number | null;
 }
@@ -93,9 +102,17 @@ export function toCanonicalEvents(
         goalkeeperId: e.outcome === ShotOutcome.SAVED ? `${opp}:${activeGk[opp]}` : null,
         blockerId: e.outcome === ShotOutcome.BLOCKED && e.blockerNumber != null
           ? `${opp}:${e.blockerNumber}` : null,
+        assisterId: e.outcome === ShotOutcome.GOAL && e.assisterNumber != null
+          ? `${e.side}:${e.assisterNumber}` : null,
       };
     } else if (e.type === EventType.TURNOVER) {
-      payload = { phase: e.phase ?? undefined, tacticalContext: e.tacticalContext ?? undefined };
+      payload = {
+        phase: e.phase ?? undefined, tacticalContext: e.tacticalContext ?? undefined,
+        reason: e.turnoverReason ?? undefined,
+      };
+    } else if (e.type === EventType.FOUL) {
+      const opp: Side = e.side === 'HOME' ? 'AWAY' : 'HOME';
+      payload = { drawnById: e.drawnByNumber != null ? `${opp}:${e.drawnByNumber}` : null };
     } else if (e.type === EventType.SUBSTITUTION) {
       payload = {
         playerOutId: e.subOutNumber != null ? `${e.side}:${e.subOutNumber}` : null,
@@ -158,8 +175,8 @@ export function liveStats(meta: MatchMeta, events: UiEvent[], home: UiTeam, away
 
 // Reexportes para que la UI importe todo lo "handball" desde un único sitio.
 export { EventType, ShotOrigin, ShotOutcome } from '@handball/core';
-export { AttackPhase, TacticalContext } from '@handball/core';
+export { AttackPhase, TacticalContext, TurnoverReason } from '@handball/core';
 export { PLAY_SCORE_WEIGHTS, computePlayScore } from '@handball/core';
 export type { MatchEvent } from '@handball/core';
-export type { MatchSummary, TeamSummary, PlayerLine, PlayScore, PlayScoreTerm, OriginCount, OriginBreakdown } from '@handball/core';
+export type { MatchSummary, TeamSummary, PlayerLine, PlayScore, PlayScoreTerm, OriginCount, OriginBreakdown, TacticalCount, TacticalBreakdown, TurnoverBreakdown } from '@handball/core';
 export type { NormalizedMatch } from '@handball/core';

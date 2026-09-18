@@ -3,8 +3,8 @@ import { useState } from 'react';
 import { Shield, Pencil, X, Plus, ArrowLeftRight, BookMarked, Check, Loader2 } from 'lucide-react';
 import { PALETTE as C, MONO } from '@/lib/theme';
 import { fmt } from '@/lib/handball/format';
-import { ACTIONS, ActionDef, Tone, isTerminalAction } from '@/lib/handball/actions';
-import { UiTeam, Side, ShotOrigin, UiEvent, onCourtAt, AttackPhase, EventType, TacticalContext } from '@/lib/handball/mapping';
+import { ACTIONS, ActionDef, Tone, isTerminalAction, TURNOVER_REASONS, TURNOVER_REASON_LABEL } from '@/lib/handball/actions';
+import { UiTeam, Side, ShotOrigin, UiEvent, onCourtAt, AttackPhase, EventType, TacticalContext, TurnoverReason } from '@/lib/handball/mapping';
 import { GoalTarget } from './GoalTarget';
 import { ShotOriginCourt, ORIGIN_LABEL } from './ShotOriginCourt';
 import { TacticalContextModal } from './TacticalContextModal';
@@ -20,6 +20,12 @@ interface Props {
   zone: number | null; setZone: (z: number | null) => void;
   origin: ShotOrigin | null; setOrigin: (o: ShotOrigin | null) => void;
   blocker: number | null; setBlocker: (n: number | null) => void;
+  /** Compañero que asiste el próximo Gol (opcional). Mismo equipo que quien anota. */
+  assister: number | null; setAssister: (n: number | null) => void;
+  /** Jugador rival que provoca (sufre) la próxima Falta (opcional). */
+  drawnBy: number | null; setDrawnBy: (n: number | null) => void;
+  /** Motivo de la próxima Pérdida (opcional). */
+  turnoverReason: TurnoverReason | null; setTurnoverReason: (r: TurnoverReason | null) => void;
   isPenalty: boolean; setIsPenalty: (v: boolean) => void;
   /** Fase de ataque activa (se aplica a la próxima acción de tiro/pérdida). */
   phase: AttackPhase; setPhase: (p: AttackPhase) => void;
@@ -360,6 +366,50 @@ export function TagPanel(p: Props) {
 
       <div className="p-2.5 rounded-md" style={{ background: C.panel2, border: `1px solid ${C.line}` }}>
         <div className="flex items-center justify-between mb-1.5">
+          <span style={{ fontSize: 11, color: C.text, fontWeight: 600 }}>¿Quién asiste?</span>
+          <span style={{ fontSize: 10, color: C.faint }}>{team.name}</span>
+        </div>
+        <div className="flex flex-wrap gap-1">
+          {team.players.filter((pl) => pl.number !== p.player).map((pl) => (
+            <button key={pl.number} onClick={() => p.setAssister(p.assister === pl.number ? null : pl.number)}
+              className="w-8 h-7 rounded-md"
+              style={{ fontFamily: MONO, fontSize: 12, fontWeight: 700,
+                background: p.assister === pl.number ? accent : C.panel,
+                color: p.assister === pl.number ? '#0E1420' : C.muted,
+                border: `1px solid ${p.assister === pl.number ? accent : C.line}` }}>
+              {pl.number}
+            </button>
+          ))}
+        </div>
+        <div style={{ fontSize: 10, color: C.faint, marginTop: 4 }}>
+          Opcional — solo aplica a «Gol». Sin compañero, no se atribuye asistencia.
+        </div>
+      </div>
+
+      <div className="p-2.5 rounded-md" style={{ background: C.panel2, border: `1px solid ${C.line}` }}>
+        <div className="flex items-center justify-between mb-1.5">
+          <span style={{ fontSize: 11, color: C.text, fontWeight: 600 }}>¿A quién se la hace?</span>
+          <span style={{ fontSize: 10, color: C.faint }}>{rival.name}</span>
+        </div>
+        <div className="flex flex-wrap gap-1">
+          {rival.players.map((pl) => (
+            <button key={pl.number} onClick={() => p.setDrawnBy(p.drawnBy === pl.number ? null : pl.number)}
+              className="w-8 h-7 rounded-md"
+              style={{ fontFamily: MONO, fontSize: 12, fontWeight: 700,
+                background: p.drawnBy === pl.number ? rivalAccent : C.panel,
+                color: p.drawnBy === pl.number ? '#0E1420' : C.muted,
+                border: `1px solid ${p.drawnBy === pl.number ? rivalAccent : C.line}` }}>
+              {pl.number}
+            </button>
+          ))}
+        </div>
+        <div style={{ fontSize: 10, color: C.faint, marginTop: 4 }}>
+          Opcional — solo aplica a «Falta». Sin jugador, cuenta solo como cometida (no provocada).
+        </div>
+      </div>
+
+      <div className="p-2.5 rounded-md" style={{ background: C.panel2, border: `1px solid ${C.line}` }}>
+        <div className="flex items-center justify-between mb-1.5">
           <span style={{ fontSize: 11, color: C.text, fontWeight: 600 }}>Fase del ataque</span>
           <span style={{ fontSize: 10, color: C.faint }}>se aplica a gol / tiro / pérdida</span>
         </div>
@@ -373,6 +423,26 @@ export function TagPanel(p: Props) {
               </button>
             );
           })}
+        </div>
+      </div>
+
+      <div className="p-2.5 rounded-md" style={{ background: C.panel2, border: `1px solid ${C.line}` }}>
+        <div className="flex items-center justify-between mb-1.5">
+          <span style={{ fontSize: 11, color: C.text, fontWeight: 600 }}>Motivo de la pérdida</span>
+        </div>
+        <div className="grid grid-cols-2 gap-1.5">
+          {TURNOVER_REASONS.map((r) => {
+            const on = p.turnoverReason === r;
+            return (
+              <button key={r} onClick={() => p.setTurnoverReason(on ? null : r)} className="py-2 rounded-md text-sm"
+                style={{ background: on ? accent : C.panel, color: on ? '#0E1420' : C.muted, border: `1px solid ${on ? accent : C.line}`, fontWeight: on ? 700 : 500 }}>
+                {TURNOVER_REASON_LABEL[r]}
+              </button>
+            );
+          })}
+        </div>
+        <div style={{ fontSize: 10, color: C.faint, marginTop: 4 }}>
+          Opcional — solo aplica a «Pérdida». Sin motivo, no entra en el desglose por tipo.
         </div>
       </div>
     </>

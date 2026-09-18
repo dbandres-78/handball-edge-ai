@@ -6,6 +6,7 @@ import { fmt } from '@/lib/handball/format';
 import { ActionDef, ACTIONS } from '@/lib/handball/actions';
 import {
   EventType, ShotOrigin, ShotOutcome, UiEvent, UiClip, UiTeam, Side, liveStats, AttackPhase, TacticalContext,
+  TurnoverReason,
 } from '@/lib/handball/mapping';
 import {
   deriveClips, DEFAULT_CLIP_WINDOW, DerivedClip, ClipFilter, ClipWindow, ClipOverride,
@@ -49,6 +50,9 @@ export function AnalysisRoom({ match }: { match: LoadedMatch }) {
   const [zone, setZone] = useState<number | null>(null);
   const [origin, setOrigin] = useState<ShotOrigin | null>(null);
   const [blocker, setBlocker] = useState<number | null>(null);
+  const [assister, setAssister] = useState<number | null>(null);
+  const [drawnBy, setDrawnBy] = useState<number | null>(null);
+  const [turnoverReason, setTurnoverReason] = useState<TurnoverReason | null>(null);
   const [isPenalty, setIsPenalty] = useState(false);
   const [phase, setPhase] = useState<AttackPhase>(AttackPhase.POSITIONAL);
 
@@ -146,6 +150,9 @@ export function AnalysisRoom({ match }: { match: LoadedMatch }) {
       type: a.type, outcome: a.outcome ?? null, zone: a.shot ? zone : null,
       origin: a.shot ? origin : null,
       blockerNumber: a.outcome === ShotOutcome.BLOCKED ? blocker : null,
+      assisterNumber: a.outcome === ShotOutcome.GOAL ? assister : null,
+      drawnByNumber: a.type === EventType.FOUL ? drawnBy : null,
+      turnoverReason: a.type === EventType.TURNOVER ? turnoverReason : null,
       isPenalty: a.shot && isPenalty ? true : undefined,
       phase: carriesPhase ? phase : undefined,
       tacticalContext: carriesPhase ? tacticalContext ?? undefined : undefined,
@@ -153,7 +160,9 @@ export function AnalysisRoom({ match }: { match: LoadedMatch }) {
     const next = [...events, e].sort((x, y) => x.t - y.t);
     setEvents(next);
     void persistence.record(next);
-    if (a.shot) { setZone(null); setOrigin(null); setBlocker(null); setIsPenalty(false); }
+    if (a.shot) { setZone(null); setOrigin(null); setBlocker(null); setIsPenalty(false); setAssister(null); }
+    if (a.type === EventType.FOUL) setDrawnBy(null);
+    if (a.type === EventType.TURNOVER) setTurnoverReason(null);
     doFlash(`${a.label} · ${a.teamOnly ? (side === 'HOME' ? home.name : away.name) : '#' + player} · ${fmt(time)}`);
     // Fin de posesión (tiro o pérdida): la pelota pasa al rival → cambia el equipo activo.
     if (autoSwitch && (a.type === EventType.SHOT || a.type === EventType.TURNOVER)) {
@@ -334,6 +343,8 @@ export function AnalysisRoom({ match }: { match: LoadedMatch }) {
             {tab === 'tag' && (
               <TagPanel side={side} setSide={setSide} autoSwitch={autoSwitch} setAutoSwitch={setAutoSwitch} player={player} setPlayer={setPlayer} period={period} setPeriod={setPeriod}
                 zone={zone} setZone={setZone} origin={origin} setOrigin={setOrigin} blocker={blocker} setBlocker={setBlocker} isPenalty={isPenalty} setIsPenalty={setIsPenalty}
+                assister={assister} setAssister={setAssister} drawnBy={drawnBy} setDrawnBy={setDrawnBy}
+                turnoverReason={turnoverReason} setTurnoverReason={setTurnoverReason}
                 phase={phase} setPhase={setPhase}
                 home={home} away={away} setHome={setHome} setAway={setAway}
                 editRoster={editRoster} setEditRoster={setEditRoster} tag={tag} time={time}

@@ -1,5 +1,5 @@
 import { TeamSide } from '../domain/normalized-match';
-import { ShotOrigin } from '../domain/match-event';
+import { ShotOrigin, TacticalContext, TurnoverReason } from '../domain/match-event';
 
 /**
  * Conteo por zona de lanzamiento. Es la materia prima del xG: sin saber desde dónde se tira
@@ -16,6 +16,22 @@ export interface OriginCount {
 }
 
 export type OriginBreakdown = Partial<Record<ShotOrigin, OriginCount>>;
+
+/**
+ * Conteo por combinación táctica previa (permuta/cruce/desdoblamiento/cortina/acción individual).
+ * Misma idea que `OriginCount` (es la tabla "Sistema De Partido" de referencia): además de los
+ * desenlaces de tiro, cuenta cuántas veces esa combinación terminó en pérdida (`turnovers`) y
+ * cuántos de sus tiros eran de 7 metros (`penalties`). `shots + turnovers` = "veces jugada".
+ */
+export interface TacticalCount extends OriginCount {
+  turnovers: number;   // la combinación terminó en pérdida, no en tiro
+  penalties: number;   // de esos tiros, cuántos eran de 7 metros
+}
+
+export type TacticalBreakdown = Partial<Record<TacticalContext, TacticalCount>>;
+
+/** Pérdidas por motivo (falta en ataque/robo de pase/recepción/pisando área/dobles/pasos). */
+export type TurnoverBreakdown = Partial<Record<TurnoverReason, number>>;
 
 /**
  * 'fitted' = peso reconstruido por regresión sobre los informes.
@@ -56,7 +72,9 @@ export interface PlayerLine {
   turnovers: number;
   steals: number;
   blocks: number;               // blocajes defensivos atribuidos (requiere blockerId en el tiro)
-  fouls: number;
+  assists: number;              // pases de gol atribuidos (requiere assisterId en el tiro con GOAL)
+  fouls: number;                // faltas COMETIDAS por este jugador
+  foulsDrawn: number;           // faltas PROVOCADAS (sufridas) por este jugador, requiere drawnById en FOUL
   twoMinutes: number;
   yellowCards: number;
   redCards: number;
@@ -92,6 +110,8 @@ export interface TeamSummary {
   xgot: number;                 // expected goals on target del equipo
   byOrigin: OriginBreakdown;    // tiros/goles por zona de lanzamiento (base del xG)
   goalZones: Partial<Record<number, number>>;   // goles por zona de portería 1..9 (base del xGOT)
+  tacticalContext: TacticalBreakdown;   // tiros/pérdidas por combinación previa (tabla "Sistema De Partido")
+  turnoversByReason: TurnoverBreakdown;   // pérdidas por motivo (falta en ataque/robo de pase/recepción/...)
   turnovers: number;
   steals: number;
   blocks: number;

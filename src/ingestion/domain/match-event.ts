@@ -61,6 +61,7 @@ export enum TacticalContext {
   CRUCE = 'CRUCE',                     // cruce de trayectorias entre dos atacantes con balón
   DESDOBLAMIENTO = 'DESDOBLAMIENTO',   // un atacante se desdobla tras pasar y ataca el espacio
   CORTINA = 'CORTINA',                 // bloqueo/pantalla de un atacante sin balón para liberar a otro
+  ACCION_INDIVIDUAL = 'ACCION_INDIVIDUAL',   // no hubo combinación: el atacante resuelve por sí solo (1x1)
 }
 
 export interface ShotPayload {
@@ -69,15 +70,41 @@ export interface ShotPayload {
   zone?: number;                 // 1..9 (zona de portería) -> input de xGOT (colocación)
   isPenalty?: boolean;
   phase?: AttackPhase;           // fase del ataque (posicional / contraataque) -> eficiencia por fase
-  tacticalContext?: TacticalContext;   // combinación previa (opcional, saltable) -> permuta/cruce/desdoblamiento/cortina
+  tacticalContext?: TacticalContext;   // combinación previa (opcional, saltable) -> permuta/cruce/desdoblamiento/cortina/individual
   goalkeeperId?: string | null;  // portero rival implicado (si SAVED)
   blockerId?: string | null;     // defensor que bloca (si BLOCKED); sin él, el blocaje no se atribuye
+  assisterId?: string | null;    // compañero cuyo pase precede el gol (solo GOAL); sin él, no hay asistencia atribuida
+}
+
+/**
+ * Motivo de la pérdida. Distingue las "forzadas" (mérito del rival: se la interceptan) de las
+ * "evitables" (error propio) — la misma distinción que ya hacía el informe AP STATS original
+ * (ver `claude/hacia_el_informe_ideal.md`, sección 1, punto 11) pero que hasta ahora no se
+ * capturaba en ningún evento: solo se sabía que hubo pérdida, no por qué.
+ */
+export enum TurnoverReason {
+  FALTA_EN_ATAQUE = 'FALTA_EN_ATAQUE',   // falta cometida por el propio atacante (p.ej. pasos con contacto)
+  ROBO_DE_PASE = 'ROBO_DE_PASE',         // el rival intercepta el pase (forzada, mérito rival)
+  RECEPCION = 'RECEPCION',               // fallo al recibir/controlar el balón
+  PISANDO_AREA = 'PISANDO_AREA',         // el atacante pisa el área de portería
+  DOBLES = 'DOBLES',                     // dobles (dos botes o bote tras parar)
+  PASOS = 'PASOS',                       // más de 3 pasos con el balón
 }
 
 /** Pérdida de balón. Cierra la posesión; lleva la fase para la eficiencia por fase. */
 export interface TurnoverPayload {
   phase?: AttackPhase;
   tacticalContext?: TacticalContext;   // combinación previa (opcional, saltable)
+  reason?: TurnoverReason;             // motivo (opcional, saltable): sin él, no entra en el desglose por motivo
+}
+
+/**
+ * Falta. El jugador del evento (`playerId`) es quien la COMETE. `drawnById` es OPCIONAL: el
+ * jugador rival que la PROVOCA (la sufre) — igual que `blockerId` en un blocaje, sin él la falta
+ * cuenta como cometida pero no se atribuye una "provocada" a nadie del otro equipo.
+ */
+export interface FoulPayload {
+  drawnById?: string | null;
 }
 
 /**

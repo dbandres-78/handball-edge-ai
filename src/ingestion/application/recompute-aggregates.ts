@@ -1,12 +1,19 @@
-import { AttackPhase, EventType, MatchEvent, ShotOrigin, ShotOutcome, ShotPayload, SubstitutionPayload, TurnoverPayload } from '../domain/match-event';
+import {
+  AttackPhase, EventType, FoulPayload, MatchEvent, ShotOrigin, ShotOutcome, ShotPayload,
+  SubstitutionPayload, TacticalContext, TurnoverPayload,
+} from '../domain/match-event';
 import { computePlayScore } from './play-score';
 import { computeXg } from './xg';
-import { MatchSummary, OnCourtSplits, OriginBreakdown, PlayerLine, TeamSummary } from './read-models';
+import {
+  MatchSummary, OnCourtSplits, OriginBreakdown, PlayerLine, TacticalBreakdown, TacticalCount,
+  TeamSummary, TurnoverBreakdown,
+} from './read-models';
 import { ResolvedRoster, ResolvedTeam } from './ports/repositories';
 
 interface PlayerAcc {
   goals: number; shots: number; misses: number; saves: number;
-  turnovers: number; steals: number; blocks: number; fouls: number;
+  turnovers: number; steals: number; blocks: number; assists: number;
+  fouls: number; foulsDrawn: number;
   twoMinutes: number; yellowCards: number; redCards: number;
   plusMinus: number;
   msOnCourt: number;
@@ -33,11 +40,33 @@ function addOrigin(bag: OriginBreakdown, origin: ShotOrigin | undefined, outcome
   bag[origin] = c;
 }
 
+/**
+ * Suma un tiro o una pérdida a su combinación táctica previa (tabla "Sistema De Partido").
+ * Sin combinación anotada (paso opcional saltado), no entra en el desglose — igual que un tiro
+ * sin zona no entra en `byOrigin`.
+ */
+function addTactical(
+  bag: TacticalBreakdown, ctx: TacticalContext | undefined,
+  kind: 'shot' | 'turnover', outcome?: ShotOutcome, isPenalty?: boolean,
+): void {
+  if (!ctx) return;
+  const c: TacticalCount = bag[ctx] ?? { shots: 0, goals: 0, onTarget: 0, saved: 0, missed: 0, blocked: 0, turnovers: 0, penalties: 0 };
+  if (kind === 'turnover') { c.turnovers++; bag[ctx] = c; return; }
+  c.shots++;
+  if (isPenalty) c.penalties++;
+  if (outcome === ShotOutcome.GOAL) { c.goals++; c.onTarget++; }
+  else if (outcome === ShotOutcome.SAVED) { c.saved++; c.onTarget++; }
+  else if (outcome === ShotOutcome.MISSED) { c.missed++; }
+  else if (outcome === ShotOutcome.BLOCKED) { c.blocked++; }
+  bag[ctx] = c;
+}
+
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
 const emptyPlayerAcc = (): PlayerAcc => ({
   goals: 0, shots: 0, misses: 0, saves: 0,
-  turnovers: 0, steals: 0, blocks: 0, fouls: 0,
+  turnovers: 0, steals: 0, blocks: 0, assists: 0,
+  fouls: 0, foulsDrawn: 0,
   twoMinutes: 0, yellowCards: 0, redCards: 0,
   plusMinus: 0,
   msOnCourt: 0,
@@ -75,13 +104,18 @@ export function recomputeAggregates(
   const teamXgot = new Map<string, number>();
   const teamOrigins = new Map<string, OriginBreakdown>();
   const teamGoalZones = new Map<string, Partial<Record<number, number>>>();
+  const teamTactical = new Map<string, TacticalBreakdown>();
+  const teamTurnoverReasons = new Map<string, TurnoverBreakdown>();
   // Posesiones y desglose por fase.
   const teamPoss = new Map<string, number>();
   const teamPossPos = new Map<string, number>();
   const teamPossCounter = new Map<string, number>();
   const teamGoalsPos = new Map<string, number>();
   const teamGoalsCounter = new Map<string, number>();
-  for (const t of roster.teams) { teamOrigins.set(t.teamId, {}); teamGoalZones.set(t.teamId, {}); }
+  for (const t of roster.teams) {
+    teamOrigins.set(t.teamId, {}); teamGoalZones.set(t.teamId, {});
+    teamTactical.set(t.teamId, {}); teamTurnoverReasons.set(t.teamId, {});
+  }
   for (const t of roster.teams) {
     for (const m of [teamGoals, teamSaves, teamTurnovers, teamSteals, teamBlocks, teamNearPasses, teamTwoMin, teamYellow, teamRed, teamTimeouts, teamShots, teamXg, teamXgot, teamPoss, teamPossPos, teamPossCounter, teamGoalsPos, teamGoalsCounter]) {
       m.set(t.teamId, 0);
@@ -183,6 +217,7 @@ export function recomputeAggregates(
         if (acc) acc.shots++;
         addOrigin(teamOrigins.get(ev.teamId)!, shot.origin, shot.outcome);
         if (acc) addOrigin(acc.byOrigin, shot.origin, shot.outcome);
+        addTactical(teamTactical.get(ev.teamId)!, shot.tacticalContext, 'shot', shot.outcome, shot.isPenalty);
 
         // xG / xGOT: onTarget = tiro que va a puerta (gol o parada).
         const onTarget = shot.outcome === ShotOutcome.GOAL || shot.outcome === ShotOutcome.SAVED;
@@ -225,6 +260,12 @@ export function recomputeAggregates(
           const blockerTeam = teamOfPlayer.get(shot.blockerId);
           if (blockerTeam) inc(teamBlocks, blockerTeam);
         }
+        // Asistencia: solo en GOAL, y solo si el asistente es del mismo equipo que quien marca
+        // (si no, se ignora — dato inconsistente, no se atribuye a nadie).
+        if (shot.outcome === ShotOutcome.GOAL && shot.assisterId && shot.assisterId !== ev.playerId) {
+          const assister = playerAcc.get(shot.assisterId);
+          if (assister && teamOfPlayer.get(shot.assisterId) === ev.teamId) assister.assists++;
+        }
         // Un tiro cierra siempre la posesión del que lanza (incluido el 7 m, que lleva fase).
         endPossession(ev.teamId, shot.phase, shot.outcome === ShotOutcome.GOAL);
         holder = opponentTeamId.get(ev.teamId);
@@ -235,6 +276,11 @@ export function recomputeAggregates(
         if (acc) acc.turnovers++;
         inc(teamTurnovers, ev.teamId);
         const to = ev.payload as unknown as TurnoverPayload;
+        addTactical(teamTactical.get(ev.teamId)!, to.tacticalContext, 'turnover');
+        if (to.reason) {
+          const bag = teamTurnoverReasons.get(ev.teamId)!;
+          bag[to.reason] = (bag[to.reason] ?? 0) + 1;
+        }
         // La pérdida cierra posesión, salvo que un robo del rival ya la hubiera cerrado (mismo balón).
         if (pendingStealLoser === ev.teamId) { pendingStealLoser = undefined; }
         else { endPossession(ev.teamId, to.phase, false); }
@@ -256,7 +302,17 @@ export function recomputeAggregates(
         break;
       }
       case EventType.NEAR_PASS: inc(teamNearPasses, ev.teamId); break;   // evento de equipo, sin jugador
-      case EventType.FOUL:     if (acc) acc.fouls++; break;
+      case EventType.FOUL: {
+        if (acc) acc.fouls++;
+        const foul = ev.payload as unknown as FoulPayload;
+        if (foul?.drawnById) {
+          const drawer = playerAcc.get(foul.drawnById);
+          // La falta la provoca alguien del equipo RIVAL a quien la comete; si coincide con
+          // el mismo equipo (dato inconsistente), no se atribuye.
+          if (drawer && teamOfPlayer.get(foul.drawnById) !== ev.teamId) drawer.foulsDrawn++;
+        }
+        break;
+      }
       case EventType.TWO_MINUTES: if (acc) acc.twoMinutes++; inc(teamTwoMin, ev.teamId); break;
       case EventType.YELLOW_CARD: if (acc) acc.yellowCards++; inc(teamYellow, ev.teamId); break;
       case EventType.RED_CARD:    if (acc) acc.redCards++;    inc(teamRed, ev.teamId); break;
@@ -286,6 +342,8 @@ export function recomputeAggregates(
       xgot: round2(teamXgot.get(t.teamId) ?? 0),
       byOrigin: teamOrigins.get(t.teamId) ?? {},
       goalZones: teamGoalZones.get(t.teamId) ?? {},
+      tacticalContext: teamTactical.get(t.teamId) ?? {},
+      turnoversByReason: teamTurnoverReasons.get(t.teamId) ?? {},
       turnovers: teamTurnovers.get(t.teamId) ?? 0,
       steals: teamSteals.get(t.teamId) ?? 0,
       blocks: teamBlocks.get(t.teamId) ?? 0,
@@ -330,7 +388,8 @@ export function recomputeAggregates(
       position: p.position,
       goals: a.goals, shots: a.shots, misses: a.misses, saves: a.saves,
       xg: round2(a.xg), xgot: round2(a.xgot), byOrigin: a.byOrigin,
-      turnovers: a.turnovers, steals: a.steals, blocks: a.blocks, fouls: a.fouls,
+      turnovers: a.turnovers, steals: a.steals, blocks: a.blocks, assists: a.assists,
+      fouls: a.fouls, foulsDrawn: a.foulsDrawn,
       twoMinutes: a.twoMinutes, yellowCards: a.yellowCards, redCards: a.redCards,
       plusMinus: a.plusMinus,
       minutesPlayed: Math.round((a.msOnCourt / 60000) * 10) / 10,
