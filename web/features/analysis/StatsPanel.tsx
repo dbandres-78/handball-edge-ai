@@ -1,5 +1,5 @@
 'use client';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Shield, ChevronRight, Download } from 'lucide-react';
 import { PALETTE as C, MONO } from '@/lib/theme';
 import { TERM_ES } from '@/lib/handball/actions';
@@ -62,12 +62,43 @@ export function StatsPanel(p: Props) {
     URL.revokeObjectURL(url);
   };
 
+  const [pdfBusy, setPdfBusy] = useState(false);
+  const exportPdf = async () => {
+    if (pdfBusy) return;
+    setPdfBusy(true);
+    try {
+      // Import perezoso: @react-pdf/renderer (y el documento, que lo importa a su vez) es
+      // pesado y solo hace falta al pulsar el botón — así no engorda el bundle de la sala.
+      const [{ pdf }, { MatchReportDocument, matchReportFilename }] = await Promise.all([
+        import('@react-pdf/renderer'),
+        import('@/lib/reports/MatchReportDocument'),
+      ]);
+      const blob = await pdf(<MatchReportDocument stats={p.stats} />).toBlob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = matchReportFilename(p.stats);
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } finally {
+      setPdfBusy(false);
+    }
+  };
+
   return (
     <div className="p-3 flex flex-col gap-3">
-      <button onClick={exportCsv} className="flex items-center justify-center gap-1.5 py-2 rounded-md text-sm"
-        style={{ background: C.goal, color: '#0E1420', fontWeight: 700 }}>
-        <Download size={14} /> Exportar informe (.csv)
-      </button>
+      <div className="flex gap-2">
+        <button onClick={exportPdf} disabled={pdfBusy} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-md text-sm"
+          style={{ background: C.amber, color: '#0E1420', fontWeight: 700, opacity: pdfBusy ? 0.6 : 1 }}>
+          <Download size={14} /> {pdfBusy ? 'Generando…' : 'Informe PDF'}
+        </button>
+        <button onClick={exportCsv} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-md text-sm"
+          style={{ background: C.goal, color: '#0E1420', fontWeight: 700 }}>
+          <Download size={14} /> Exportar (.csv)
+        </button>
+      </div>
 
       <div className="flex rounded-md overflow-hidden" style={{ border: `1px solid ${C.line}` }}>
         {(['HOME', 'AWAY'] as Side[]).map((sd) => (
