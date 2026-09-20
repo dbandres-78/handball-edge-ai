@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { Plus, Trash2, Loader2 } from 'lucide-react';
+import { Plus, Trash2, Loader2, Users } from 'lucide-react';
 import { PALETTE as C, MONO } from '@/lib/theme';
 import type { Season, RosterPlayer, RosterPlayerPatch } from './types';
 import { PhotoUploader } from './PhotoUploader';
@@ -32,6 +32,12 @@ export function ClubRosterManager({ clubId }: { clubId: string }) {
   const [nName, setNName] = useState('');
   const [nGk, setNGk] = useState(false);
   const [busyAdd, setBusyAdd] = useState(false);
+  const [addError, setAddError] = useState<string | null>(null);
+
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkText, setBulkText] = useState('');
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkResult, setBulkResult] = useState<string | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -59,19 +65,24 @@ export function ClubRosterManager({ clubId }: { clubId: string }) {
     const code = newSeason.trim();
     if (!code) return;
     setAddingSeason(true);
+    setAddError(null);
     try {
       const res = await fetch('/api/catalog/seasons', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code }),
       });
-      const d = await res.json();
-      if (res.ok) {
+      const d = await res.json().catch(() => null);
+      if (res.ok && d?.season) {
         setSeasons((s) => {
           const list = s ? [...s.filter((x) => x.code !== d.season.code), d.season] : [d.season];
           return list.sort((a, b) => a.code.localeCompare(b.code));
         });
         setSeason(d.season.code);
         setNewSeason('');
+      } else {
+        setAddError(d?.error ?? `No se pudo crear la temporada (HTTP ${res.status})`);
       }
+    } catch {
+      setAddError('No se pudo contactar con el servidor. Comprueba tu conexión e inténtalo de nuevo.');
     } finally {
       setAddingSeason(false);
     }
@@ -80,6 +91,7 @@ export function ClubRosterManager({ clubId }: { clubId: string }) {
   const addPlayer = async () => {
     if (!season || !nName.trim()) return;
     setBusyAdd(true);
+    setAddError(null);
     try {
       const res = await fetch(`/api/catalog/clubs/${clubId}/roster`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -90,9 +102,64 @@ export function ClubRosterManager({ clubId }: { clubId: string }) {
         setNGk(false);
         setNNumber((n) => n + 1);
         setReloadKey((k) => k + 1);
+      } else {
+        // Antes, un fallo aquí no se veía: el botón simplemente "no hacía nada" y parecía que
+        // la app no dejaba añadir jugadores. Ahora se muestra el motivo tal cual lo da el servidor.
+        const d = await res.json().catch(() => null);
+        setAddError(d?.error ?? `Error al guardar (HTTP ${res.status})`);
       }
+    } catch {
+      setAddError('No se pudo contactar con el servidor. Comprueba tu conexión e inténtalo de nuevo.');
     } finally {
       setBusyAdd(false);
+    }
+  };
+
+  /**
+   * Alta masiva: una línea por jugador, "dorsal nombre" (p.ej. "7 Juan Pérez"), añadiendo
+   * "POR"/"PORTERO"/"GK" al final para marcar portero. Pensado para cargar plantillas completas
+   * de golpe al dar de alta un equipo nuevo, en vez de meter jugador a jugador.
+   */
+  const bulkAddPlayers = async () => {
+    if (!season) return;
+    const lines = bulkText.split('\n').map((l) => l.trim()).filter(Boolean);
+    if (lines.length === 0) return;
+    setBulkBusy(true);
+    setBulkResult(null);
+    setAddError(null);
+    let ok = 0;
+    const failed: string[] = [];
+    for (const line of lines) {
+      const m = line.match(/^(\d+)[.\-)]?\s+(.+)$/);
+      if (!m) { failed.push(`"${line}" (formato esperado: dorsal + nombre)`); continue; }
+      const number = Number(m[1]);
+      let name = m[2].trim();
+      let gk = false;
+      const gkMatch = name.match(/^(.*?)[\s,]+(POR|PORTERO|GK)$/i);
+      if (gkMatch) { name = gkMatch[1].trim(); gk = true; }
+      if (!name) { failed.push(`"${line}" (sin nombre)`); continue; }
+      try {
+        const res = await fetch(`/api/catalog/clubs/${clubId}/roster`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ season, number, name, position: gk ? 'GK' : undefined }),
+        });
+        if (res.ok) ok += 1;
+        else {
+          const d = await res.json().catch(() => null);
+          failed.push(`"${line}" (${d?.error ?? `HTTP ${res.status}`})`);
+        }
+      } catch {
+        failed.push(`"${line}" (sin conexión)`);
+      }
+    }
+    setBulkBusy(false);
+    setReloadKey((k) => k + 1);
+    if (failed.length === 0) {
+      setBulkResult(`Añadidos ${ok} jugadores.`);
+      setBulkText('');
+      setBulkOpen(false);
+    } else {
+      setBulkResult(`Añadidos ${ok} de ${lines.length}. Sin añadir: ${failed.join('; ')}`);
     }
   };
 
@@ -129,7 +196,43 @@ export function ClubRosterManager({ clubId }: { clubId: string }) {
           style={{ background: C.panel2, border: `1px solid ${C.line}`, color: C.text }}>
           {addingSeason ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />} Temporada
         </button>
+
+        {season && (
+          <button onClick={() => { setBulkOpen((o) => !o); setBulkResult(null); }}
+            className="flex items-center gap-1 px-2 py-1.5 rounded-md text-xs ml-auto"
+            style={{ background: bulkOpen ? C.amber : C.panel2, color: bulkOpen ? '#0E1420' : C.text, border: `1px solid ${bulkOpen ? C.amber : C.line}` }}>
+            <Users size={12} /> Pegar plantilla completa
+          </button>
+        )}
       </div>
+
+      {season && bulkOpen && (
+        <div className="mb-3 p-3 rounded-lg" style={{ border: `1px solid ${C.line}`, background: C.panel2 }}>
+          <div className="mb-2" style={{ fontSize: 11, color: C.faint }}>
+            Una línea por jugador: dorsal y nombre (añade "POR" al final para el portero). Ejemplo:
+          </div>
+          <div className="mb-2" style={{ fontSize: 11, color: C.faint, fontFamily: MONO, whiteSpace: 'pre-line' }}>
+            {'1 María López POR\n7 Ana García\n10 Laura Sánchez'}
+          </div>
+          <textarea value={bulkText} onChange={(e) => setBulkText(e.target.value)} rows={6}
+            placeholder={'1 María López POR\n7 Ana García\n10 Laura Sánchez'}
+            style={{ ...INPUT, width: '100%', fontFamily: MONO, resize: 'vertical' }} />
+          <div className="flex items-center gap-2 mt-2">
+            <button disabled={bulkBusy || !bulkText.trim()} onClick={bulkAddPlayers}
+              className="flex items-center gap-1 px-3 py-1.5 rounded-md text-xs"
+              style={{ background: C.amber, color: '#0E1420' }}>
+              {bulkBusy ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />} Añadir plantilla
+            </button>
+            {bulkResult && <span style={{ fontSize: 11, color: C.muted }}>{bulkResult}</span>}
+          </div>
+        </div>
+      )}
+
+      {addError && (
+        <div className="mb-3 px-3 py-2 rounded-md" style={{ fontSize: 12, color: '#F87171', background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.3)' }}>
+          {addError}
+        </div>
+      )}
 
       {!season ? (
         <div className="text-center py-8 rounded-lg" style={{ color: C.faint, fontSize: 13, border: `1px dashed ${C.line}` }}>
