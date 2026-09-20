@@ -20,6 +20,7 @@ const N = (v: number | null) => (v == null ? '—' : `${v}`);
 
 export function ClubProjectionView({ clubId }: { clubId: string }) {
   const [data, setData] = useState<Payload | null>(null);
+  const [notFound, setNotFound] = useState(false);
   const [season, setSeason] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [reloadKey, setReloadKey] = useState(0);
@@ -32,20 +33,40 @@ export function ClubProjectionView({ clubId }: { clubId: string }) {
     const q = season ? `?season=${encodeURIComponent(season)}` : '';
     fetch(`/api/catalog/clubs/${clubId}/projection${q}`)
       .then((r) => r.json())
-      .then((d: Payload) => {
+      .then((d: Payload & { error?: string }) => {
         if (!alive) return;
+        // El servidor puede responder sin `club` (404 "Club no encontrado"), p. ej. si el catálogo
+        // en memoria (sin Postgres configurado) se reinició entre crear el club y abrir su ficha.
+        // Sin esta guarda, leer `data.club.photoUrl` más abajo rompe toda la pantalla.
+        if (d.error || !d.club) { setNotFound(true); return; }
         setData(d);
         setSeason(d.season);
         // Un club recién creado, sin partidos aún, se abre directamente en "Plantilla":
         // la pestaña "Fichas" estaría vacía y no sirve para nada en ese momento.
         if (!tabDefaulted) { setTabDefaulted(true); if (!d.projection || d.projection.games === 0) setTab('plantilla'); }
       })
+      .catch(() => { if (alive) setNotFound(true); })
       .finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clubId, season, reloadKey]);
 
   const proj = data?.projection ?? null;
+
+  if (notFound) {
+    return (
+      <div className="max-w-4xl mx-auto px-5 py-10">
+        <Link href="/clubs" className="flex items-center gap-1.5 mb-4" style={{ fontSize: 12, color: C.muted }}>
+          <ArrowLeft size={14} /> Clubes
+        </Link>
+        <div className="text-center py-12 rounded-lg mt-4" style={{ color: C.faint, fontSize: 13, border: `1px dashed ${C.line}` }}>
+          No se encuentra este club. Si acabas de crearlo y el servidor se reinició justo después
+          (sin Postgres configurado, el catálogo vive solo en memoria), vuelve a{' '}
+          <Link href="/clubs" style={{ color: C.amber }}>Clubes y fichas</Link> y créalo de nuevo.
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-4xl mx-auto px-5 py-10">
